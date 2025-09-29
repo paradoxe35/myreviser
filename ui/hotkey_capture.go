@@ -17,12 +17,11 @@ import (
 type HotkeyCapture struct {
 	widget.BaseWidget
 	binding        binding.String
-	label          *widget.Label
 	captureBtn     *widget.Button
 	stopBtn        *widget.Button
 	clearBtn       *widget.Button
 	container      *fyne.Container
-	entry          *captureEntry // Hidden entry to capture keyboard events
+	entry          *captureEntry // Entry to capture and display keyboard events
 	window         fyne.Window   // Reference to parent window for focus
 	onCaptureStart func()        // Callback when capture starts
 	onCaptureStop  func()        // Callback when capture stops
@@ -54,20 +53,16 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 		modifiers:   make(map[fyne.KeyModifier]bool),
 	}
 
-	// Create label to display current/captured hotkey
-	h.label = widget.NewLabel(placeholder)
-	h.label.TextStyle.Monospace = true
+	// Create entry for keyboard capture and display
+	h.entry = &captureEntry{parent: h}
+	h.entry.PlaceHolder = placeholder
+	h.entry.Disable()
 
-	// Update label when binding changes
+	// Update entry when binding changes
 	currentValue, _ := binding.Get()
 	if currentValue != "" {
-		h.label.SetText(currentValue)
+		h.entry.SetText(currentValue)
 	}
-
-	// Create hidden entry for keyboard capture
-	h.entry = &captureEntry{parent: h}
-	h.entry.PlaceHolder = "Press keys when capturing..."
-	h.entry.Disable()
 
 	// Create capture button
 	h.captureBtn = widget.NewButtonWithIcon("Capture", theme.MediaRecordIcon(), func() {
@@ -93,9 +88,9 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 	// Create container
 	h.container = container.NewBorder(
 		nil, nil,
-		h.label,
+		nil,
 		buttonContainer,
-		h.entry, // Hidden entry in center for keyboard capture
+		h.entry,
 	)
 
 	h.ExtendBaseWidget(h)
@@ -127,13 +122,14 @@ func (h *HotkeyCapture) startCapture() {
 	h.modifiers = make(map[fyne.KeyModifier]bool)
 
 	// Update UI
-	h.label.SetText("Press keys... (ESC to cancel, Enter to save)")
+	h.entry.SetText("")
+	h.entry.SetPlaceHolder("Press keys... (ESC to cancel, Enter to save)")
 	h.captureBtn.Hide()
 	h.stopBtn.Show()
+	h.clearBtn.Hide() // Hide clear button during capture
 
 	// Enable and focus the entry to capture keys
 	h.entry.Enable()
-	h.entry.SetText("")
 
 	// Focus the entry widget so it receives keyboard events
 	if h.window != nil {
@@ -161,13 +157,15 @@ func (h *HotkeyCapture) stopCapture() {
 	h.entry.Disable()
 	h.stopBtn.Hide()
 	h.captureBtn.Show()
+	h.clearBtn.Show() // Show clear button again
 
 	// Restore previous value or show placeholder
 	currentValue, _ := h.binding.Get()
 	if currentValue != "" {
-		h.label.SetText(currentValue)
+		h.entry.SetText(currentValue)
 	} else {
-		h.label.SetText("Click 'Capture' to set hotkey")
+		h.entry.SetText("")
+		h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
 	}
 }
 
@@ -187,9 +185,9 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 		h.mu.Lock()
 		currentValue, _ := h.binding.Get()
 		if currentValue != "" {
-			h.label.SetText(currentValue)
+			h.entry.SetText(currentValue)
 		} else {
-			h.label.SetText("Press 'Capture' to set hotkey")
+			h.entry.SetText("")
 		}
 		return
 	}
@@ -214,8 +212,8 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	case desktop.KeySuperLeft, desktop.KeySuperRight:
 		h.modifiers[fyne.KeyModifierSuper] = true
 	default:
-		// Track the actual key (not modifiers)
-		if !isModifierKey(key.Name) {
+		// Track the actual key (not modifiers), allow up to 3 regular keys
+		if !isModifierKey(key.Name) && len(h.pressedKeys) < 3 {
 			h.pressedKeys[key.Name] = true
 		}
 	}
@@ -223,7 +221,7 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	h.updateDisplay()
 }
 
-// updateDisplay updates the label with current pressed keys
+// updateDisplay updates the entry with current pressed keys
 func (h *HotkeyCapture) updateDisplay() {
 	parts := []string{}
 
@@ -241,13 +239,17 @@ func (h *HotkeyCapture) updateDisplay() {
 		parts = append(parts, getSuperName())
 	}
 
-	// Add regular keys
+	// Add regular keys in order they were pressed (sorted for consistency)
+	keyNames := make([]string, 0, len(h.pressedKeys))
 	for keyName := range h.pressedKeys {
-		parts = append(parts, keyNameToString(keyName))
+		keyNames = append(keyNames, keyNameToString(keyName))
 	}
+	parts = append(parts, keyNames...)
 
 	if len(parts) > 0 {
-		h.label.SetText(strings.Join(parts, "+"))
+		h.entry.SetText(strings.Join(parts, "+"))
+	} else {
+		h.entry.SetText("")
 	}
 }
 
@@ -270,13 +272,15 @@ func (h *HotkeyCapture) saveHotkey() {
 	}
 
 	// Add regular keys
+	keyNames := make([]string, 0, len(h.pressedKeys))
 	for keyName := range h.pressedKeys {
-		parts = append(parts, keyNameToString(keyName))
+		keyNames = append(keyNames, keyNameToString(keyName))
 	}
+	parts = append(parts, keyNames...)
 
 	// Must have at least one modifier and one regular key
 	if len(h.modifiers) == 0 || len(h.pressedKeys) == 0 {
-		h.label.SetText("Invalid combination (need modifier + key)")
+		h.entry.SetText("Invalid combination (need modifier + key)")
 		return
 	}
 
@@ -284,13 +288,14 @@ func (h *HotkeyCapture) saveHotkey() {
 
 	// Save to binding
 	h.binding.Set(hotkeyStr)
-	h.label.SetText(hotkeyStr)
+	h.entry.SetText(hotkeyStr)
 }
 
 // clearHotkey clears the current hotkey
 func (h *HotkeyCapture) clearHotkey() {
 	h.binding.Set("")
-	h.label.SetText("Press 'Capture' to set hotkey")
+	h.entry.SetText("")
+	h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
 }
 
 // Helper functions
