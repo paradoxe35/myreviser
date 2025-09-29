@@ -1,0 +1,51 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Build artifacts
+bin/
+build/
+dist/
+myreviser
+myreviser.exe
+*.AppImage
+*.dmg
+*.deb
+*.rpm
+*.tar.gz
+*.tar.xz
+*.zip
+
+# Fyne bundled resources
+bundled.go
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Log files
+*.log
+
+# Config and lock files (local testing)
+.myreviser/
+.myscript/
+*.lock

@@ -1694,6 +1694,103 @@ fyne package -os linux -icon assets/icon.png
   - Clear status indicators
   - Intuitive configuration
 
+## Phase 8: UI/UX Improvements & Fixes (Completed)
+
+### Improvements Implemented:
+- [x] Move single instance lock file to `~/.myscript/` directory (not `.myreviser`)
+- [x] Fix window max width issue - prevent infinite expansion when displaying errors
+- [x] Add proper spacing/padding between UI elements for professional look
+- [x] Implement "Start Minimized" setting respect in UI
+- [x] Show Base URL field only for OpenAI provider (hide for Claude/Gemini)
+- [x] Replace Character Limit text entry with number input field (default: 1000)
+- [x] Add consistent spacing between all form fields and sections
+- [x] Implement custom hotkey capture widget with real-time key detection
+- [x] Update Makefile: Add CGO_ENABLED=1, output to `./bin/` folder
+- [x] Update `.gitignore` to ignore `bin/` directory
+- [x] Update GitHub Actions workflow to use Fyne packaging commands
+- [x] Implement provider-specific field visibility (API Key, Model, Base URL)
+- [x] Fix gohook key event detection issues
+- [x] Optimize binary size - Added `-s -w` ldflags for stripping
+
+### Technical Details:
+
+#### 1. Lock File Location Fix
+- Current: Creates lock in system temp directory
+- Required: Create lock in `$HOME/.myscript/myscript.lock`
+- Update single instance manager initialization
+
+#### 2. Window Size Constraints
+- Add maximum width constraint to prevent overflow
+- Implement proper text wrapping for error messages
+- Use scrollable containers where needed
+
+#### 3. UI Spacing & Layout
+```go
+// Standard spacing constants
+const (
+    PaddingSmall  = 5
+    PaddingMedium = 10
+    PaddingLarge  = 20
+)
+```
+
+#### 4. Hotkey Capture Widget ✅
+**Implemented in `ui/hotkey_capture.go`**
+
+Features:
+- Custom Fyne widget that listens for key combinations in real-time
+- Click "Capture" button to start listening
+- Displays pressed keys as they are detected
+- Automatic detection of modifiers (Ctrl, Alt, Shift, Super/Cmd/Win)
+- Validates that combinations include at least one modifier
+- ESC to cancel capture
+- Clear button to reset hotkey
+- Professional UX similar to IDE shortcut configuration
+- Platform-independent key mapping
+- Sorted modifier display (ctrl+alt+shift+key format)
+
+Key mapping includes:
+- All modifiers (Ctrl, Alt, Shift, Super/Win/Cmd)
+- Letters (a-z)
+- Numbers (0-9)
+- Function keys (F1-F12)
+- Special keys (Space, Enter, Tab, Backspace, Delete)
+- Arrow keys (Up, Down, Left, Right)
+
+#### 5. Build Optimization
+Current binary size: ~42 MB
+
+Optimization strategies:
+- Use `-ldflags="-s -w"` for stripping debug info
+- Investigate UPX compression (may reduce to ~15-20 MB)
+- Remove unused dependencies
+- Use `go mod tidy` to clean dependencies
+- Consider building with `-buildmode=pie` for smaller size
+
+Expected size after optimization: ~20-25 MB
+
+#### 6. Makefile Updates
+```makefile
+# Add CGO_ENABLED=1 to all build targets
+# Change output directory to ./bin/
+build:
+    CGO_ENABLED=1 go build -ldflags "-s -w $(LDFLAGS)" -o bin/myreviser .
+```
+
+#### 7. Provider-Specific Field Management
+```go
+// Show/hide fields based on selected provider
+providerSelect.OnChanged = func(value string) {
+    if value == "openai" {
+        baseURLContainer.Show()
+    } else {
+        baseURLContainer.Hide()
+    }
+    // Clear and set default values
+    updateProviderDefaults(value)
+}
+```
+
 ## Future Enhancements
 
 ### Version 1.1

@@ -7,6 +7,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	"fyne.io/fyne/v2/app"
 	singleinstance "github.com/allan-simon/go-singleinstance"
@@ -27,7 +28,21 @@ func main() {
 	}
 
 	// Check for single instance
-	lockFile, err := singleinstance.CreateLockFile("myreviser.lock")
+	// Create lock file in ~/.myscript/ directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Error("Failed to get user home directory", "error", err)
+		os.Exit(1)
+	}
+
+	lockDir := filepath.Join(homeDir, ".myscript")
+	if err := os.MkdirAll(lockDir, 0755); err != nil {
+		logger.Error("Failed to create lock directory", "error", err)
+		os.Exit(1)
+	}
+
+	lockPath := filepath.Join(lockDir, "myscript.lock")
+	lockFile, err := singleinstance.CreateLockFile(lockPath)
 	if err != nil {
 		logger.Error("Another instance is already running", "error", err)
 		os.Exit(1)

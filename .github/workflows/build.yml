@@ -76,8 +76,12 @@ jobs:
           go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-linux-${{ matrix.arch }}
 
       - name: Package with Fyne
+        env:
+          CGO_ENABLED: 1
         run: |
-          fyne package -os linux -icon assets/icon.png -name MyReviser -release
+          if [ -f assets/icon.png ]; then
+            fyne package -os linux -icon assets/icon.png -name MyReviser -release
+          fi
 
       - name: Create portable archive
         run: |
@@ -227,10 +231,12 @@ jobs:
           go build -ldflags "-s -w -H=windowsgui -X main.Version=$version -X main.BuildTime=$buildTime" -o myreviser-windows-${{ matrix.arch }}.exe
 
       - name: Package with Fyne
+        env:
+          CGO_ENABLED: 1
         run: |
           if (Test-Path "assets/icon.ico") {
             fyne package -os windows -icon assets/icon.ico -name MyReviser -release
-          } else {
+          } elseif (Test-Path "assets/icon.png") {
             fyne package -os windows -icon assets/icon.png -name MyReviser -release
           }
 
@@ -358,8 +364,12 @@ jobs:
           go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-darwin-${{ matrix.arch }}
 
       - name: Package with Fyne
+        env:
+          CGO_ENABLED: 1
         run: |
-          fyne package -os darwin -icon assets/icon.png -name MyReviser -release
+          if [ -f assets/icon.png ]; then
+            fyne package -os darwin -icon assets/icon.png -name MyReviser -release
+          fi
 
       - name: Create .app bundle manually if needed
         run: |

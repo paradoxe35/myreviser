@@ -3,7 +3,7 @@
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S')
-LDFLAGS := -X 'main.Version=$(VERSION)' -X 'main.BuildTime=$(BUILD_TIME)'
+LDFLAGS := -s -w -X 'main.Version=$(VERSION)' -X 'main.BuildTime=$(BUILD_TIME)'
 
 # Default target
 all: build
@@ -19,17 +19,18 @@ install-deps:
 # Build for current platform
 build:
 	@echo "Building MyReviser for current platform..."
-	go build -ldflags "$(LDFLAGS)" -o myreviser .
+	@mkdir -p bin
+	CGO_ENABLED=1 go build -ldflags "$(LDFLAGS)" -o bin/myreviser .
 
 # Run in development mode
 run:
 	@echo "Running MyReviser in development mode..."
-	go run -ldflags "$(LDFLAGS)" .
+	CGO_ENABLED=1 go run -ldflags "$(LDFLAGS)" .
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -rf build/ dist/ myreviser myreviser.exe *.AppImage *.dmg *.deb
+	rm -rf bin/ build/ dist/ myreviser myreviser.exe *.AppImage *.dmg *.deb
 	rm -f bundled.go
 
 # Run tests
@@ -45,40 +46,46 @@ bundle:
 # Package for all platforms
 package-all: clean bundle
 	@echo "Packaging for all platforms..."
-	@mkdir -p build/windows build/darwin build/linux
+	@mkdir -p bin
 
 	# Windows
-	@echo "Building for Windows..."
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
-		go build -ldflags "$(LDFLAGS) -H=windowsgui" -o build/windows/myreviser.exe
-	fyne package -os windows -icon assets/icon.ico
+	@echo "Packaging for Windows..."
+	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
+		fyne package -os windows -icon assets/icon.ico -name MyReviser -release
+	@mv MyReviser.exe bin/ 2>/dev/null || true
 
 	# macOS
-	@echo "Building for macOS..."
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
-		go build -ldflags "$(LDFLAGS)" -o build/darwin/myreviser
-	fyne package -os darwin -icon assets/icon.png
+	@echo "Packaging for macOS..."
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
+		fyne package -os darwin -icon assets/icon.png -name MyReviser -release
+	@mv MyReviser.app bin/ 2>/dev/null || true
 
 	# Linux
-	@echo "Building for Linux..."
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
-		go build -ldflags "$(LDFLAGS)" -o build/linux/myreviser
-	fyne package -os linux -icon assets/icon.png
+	@echo "Packaging for Linux..."
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+		fyne package -os linux -icon assets/icon.png -name MyReviser -release
+	@mv MyReviser.tar.xz bin/ 2>/dev/null || true
 
 # Package for Windows
 package-windows: bundle
 	@echo "Packaging for Windows..."
-	fyne package -os windows -icon assets/icon.ico
+	@mkdir -p bin
+	CGO_ENABLED=1 fyne package -os windows -icon assets/icon.ico -name MyReviser -release
+	@mv MyReviser.exe bin/ 2>/dev/null || true
 
 # Package for macOS
 package-darwin: bundle
 	@echo "Packaging for macOS..."
-	fyne package -os darwin -icon assets/icon.png
+	@mkdir -p bin
+	CGO_ENABLED=1 fyne package -os darwin -icon assets/icon.png -name MyReviser -release
+	@mv MyReviser.app bin/ 2>/dev/null || true
 
 # Package for Linux
 package-linux: bundle
 	@echo "Packaging for Linux..."
-	fyne package -os linux -icon assets/icon.png
+	@mkdir -p bin
+	CGO_ENABLED=1 fyne package -os linux -icon assets/icon.png -name MyReviser -release
+	@mv MyReviser.tar.xz bin/ 2>/dev/null || true
 
 # Install locally
 install: build

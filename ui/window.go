@@ -3,16 +3,27 @@ package ui
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/paradoxe35/myreviser-go/internal/ai"
 	"github.com/paradoxe35/myreviser-go/internal/config"
 	"github.com/paradoxe35/myreviser-go/internal/logger"
+)
+
+const (
+	// UI spacing constants
+	PaddingSmall  = 5
+	PaddingMedium = 10
+	PaddingLarge  = 20
+	MaxWindowWidth = 800
+	MaxWindowHeight = 600
 )
 
 type MainWindow struct {
@@ -21,19 +32,35 @@ type MainWindow struct {
 	config *config.Config
 
 	// Data bindings
-	providerBinding       binding.String
-	apiKeyBinding         binding.String
-	modelBinding          binding.String
-	hotkeySelectBinding   binding.String
+	providerBinding        binding.String
+	apiKeyBinding          binding.String
+	modelBinding           binding.String
+	hotkeySelectBinding    binding.String
 	hotkeySelectionBinding binding.String
-	promptBinding         binding.String
-	charLimitBinding      binding.String
-	statusBinding         binding.String
+	promptBinding          binding.String
+	charLimitBinding       binding.String
+	statusBinding          binding.String
+	startMinimizedBinding  binding.Bool
+
+	// UI containers for dynamic visibility
+	baseURLContainer   *fyne.Container
+	baseURLEntry       *widget.Entry
 }
 
 func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
 	window := app.NewWindow("MyReviser Settings")
+
+	// Set window size with constraints
 	window.Resize(fyne.NewSize(700, 500))
+	window.SetFixedSize(false)
+
+	// Set maximum size to prevent overflow
+	if desk, ok := window.(interface {
+		SetMaxSize(fyne.Size)
+	}); ok {
+		desk.SetMaxSize(fyne.NewSize(MaxWindowWidth, MaxWindowHeight))
+	}
+
 	window.CenterOnScreen()
 
 	mw := &MainWindow{
@@ -66,6 +93,7 @@ func (w *MainWindow) initBindings() {
 	w.promptBinding = binding.NewString()
 	w.charLimitBinding = binding.NewString()
 	w.statusBinding = binding.NewString()
+	w.startMinimizedBinding = binding.NewBool()
 
 	// Set initial values from config
 	w.providerBinding.Set(w.config.AIProvider.Provider)
@@ -78,8 +106,9 @@ func (w *MainWindow) initBindings() {
 	w.hotkeySelectBinding.Set(w.config.Hotkeys.SelectAll)
 	w.hotkeySelectionBinding.Set(w.config.Hotkeys.Selection)
 	w.promptBinding.Set(w.config.Revision.SystemPrompt)
-	w.charLimitBinding.Set(string(rune(w.config.Revision.CharacterLimit)))
+	w.charLimitBinding.Set(strconv.Itoa(w.config.Revision.CharacterLimit))
 	w.statusBinding.Set("Ready")
+	w.startMinimizedBinding.Set(w.config.Appearance.StartMinimized)
 }
 
 func (w *MainWindow) createContent() fyne.CanvasObject {
@@ -126,6 +155,13 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		func(value string) {
 			w.providerBinding.Set(value)
 			w.updateProviderDefaults(value)
+
+			// Show/hide Base URL based on provider
+			if value == "openai" {
+				w.baseURLContainer.Show()
+			} else {
+				w.baseURLContainer.Hide()
+			}
 		},
 	)
 	selected, _ := w.providerBinding.Get()
@@ -143,11 +179,22 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 	modelEntry.Bind(w.modelBinding)
 	modelEntry.PlaceHolder = "e.g., gpt-4o-mini"
 
-	// Base URL (for custom endpoints)
+	// Base URL (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL (optional):")
-	baseURLEntry := widget.NewEntry()
-	baseURLEntry.SetText(w.config.AIProvider.BaseURL)
-	baseURLEntry.PlaceHolder = "Default API endpoint"
+	w.baseURLEntry = widget.NewEntry()
+	w.baseURLEntry.SetText(w.config.AIProvider.BaseURL)
+	w.baseURLEntry.PlaceHolder = "Default: https://api.openai.com/v1"
+
+	// Create Base URL container for visibility control
+	w.baseURLContainer = container.NewVBox(
+		layout.NewSpacer(),
+		container.NewBorder(nil, nil, baseURLLabel, nil, w.baseURLEntry),
+	)
+
+	// Show/hide Base URL based on initial provider
+	if selected != "openai" {
+		w.baseURLContainer.Hide()
+	}
 
 	// Test connection button
 	testBtn := widget.NewButtonWithIcon("Test Connection", theme.ConfirmIcon(), func() {
@@ -156,11 +203,16 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 
 	form := container.NewVBox(
 		container.NewBorder(nil, nil, providerLabel, nil, providerSelect),
+		layout.NewSpacer(),
 		widget.NewSeparator(),
+		layout.NewSpacer(),
 		container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry),
+		layout.NewSpacer(),
 		container.NewBorder(nil, nil, modelLabel, nil, modelEntry),
-		container.NewBorder(nil, nil, baseURLLabel, nil, baseURLEntry),
+		w.baseURLContainer,
+		layout.NewSpacer(),
 		widget.NewSeparator(),
+		layout.NewSpacer(),
 		testBtn,
 	)
 
@@ -168,23 +220,23 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 }
 
 func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
-	// Select All Hotkey
+	// Select All Hotkey with capture widget
 	selectAllLabel := widget.NewLabel("Select All & Revise:")
-	selectAllEntry := widget.NewEntry()
-	selectAllEntry.Bind(w.hotkeySelectBinding)
-	selectAllEntry.PlaceHolder = "e.g., ctrl+alt+space"
+	selectAllCapture := NewHotkeyCapture(w.hotkeySelectBinding, "Click 'Capture' to set hotkey")
 
-	// Selection Hotkey
+	// Selection Hotkey with capture widget
 	selectionLabel := widget.NewLabel("Revise Selection:")
-	selectionEntry := widget.NewEntry()
-	selectionEntry.Bind(w.hotkeySelectionBinding)
-	selectionEntry.PlaceHolder = "e.g., ctrl+win"
+	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 
 	// Hotkey instructions
-	instructions := widget.NewCard("", "Hotkey Format",
-		widget.NewLabel("Use modifiers: ctrl, alt, shift, cmd/win/super\n"+
-			"Examples: 'ctrl+alt+space', 'cmd+shift+r'\n\n"+
-			"Note: Some combinations may be reserved by the OS."))
+	instructions := widget.NewCard("", "How to Capture Hotkeys",
+		widget.NewLabel("1. Click the 'Capture' button\n"+
+			"2. Press your desired key combination\n"+
+			"3. Release the keys to save\n"+
+			"4. Press ESC to cancel\n\n"+
+			"Note: You must use at least one modifier key\n"+
+			"(Ctrl, Alt, Shift, or Super/Win/Cmd).\n\n"+
+			"Some combinations may be reserved by your OS."))
 
 	// Reset to defaults button
 	resetBtn := widget.NewButton("Reset to Defaults", func() {
@@ -194,10 +246,18 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	})
 
 	form := container.NewVBox(
-		container.NewBorder(nil, nil, selectAllLabel, nil, selectAllEntry),
-		container.NewBorder(nil, nil, selectionLabel, nil, selectionEntry),
+		selectAllLabel,
+		selectAllCapture,
+		layout.NewSpacer(),
 		widget.NewSeparator(),
+		layout.NewSpacer(),
+		selectionLabel,
+		selectionCapture,
+		layout.NewSpacer(),
+		widget.NewSeparator(),
+		layout.NewSpacer(),
 		instructions,
+		layout.NewSpacer(),
 		resetBtn,
 	)
 
@@ -210,20 +270,28 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	promptEntry := widget.NewMultiLineEntry()
 	promptEntry.Bind(w.promptBinding)
 	promptEntry.SetMinRowsVisible(5)
+	promptEntry.Wrapping = fyne.TextWrapWord
 
-	// Character Limit
+	// Character Limit - using number entry
 	charLimitLabel := widget.NewLabel("Character Limit:")
 	charLimitEntry := widget.NewEntry()
 	charLimitEntry.Bind(w.charLimitBinding)
 	charLimitEntry.PlaceHolder = "1000"
+	charLimitEntry.Validator = func(s string) error {
+		if _, err := strconv.Atoi(s); err != nil && s != "" {
+			return fmt.Errorf("must be a number")
+		}
+		return nil
+	}
 
 	// Timeout
 	timeoutLabel := widget.NewLabel("Timeout (seconds):")
 	timeoutSlider := widget.NewSlider(5, 60)
 	timeoutSlider.SetValue(float64(w.config.Revision.TimeoutSeconds))
-	timeoutValue := widget.NewLabel("30s")
+	timeoutValue := widget.NewLabel(fmt.Sprintf("%ds", w.config.Revision.TimeoutSeconds))
 	timeoutSlider.OnChanged = func(value float64) {
 		timeoutValue.SetText(fmt.Sprintf("%ds", int(value)))
+		w.config.Revision.TimeoutSeconds = int(value)
 	}
 
 	// Reset prompt button
@@ -231,13 +299,26 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 		w.promptBinding.Set(config.GetDefaultRevision().SystemPrompt)
 	})
 
+	// Start Minimized checkbox
+	startMinimizedCheck := widget.NewCheck("Start minimized to system tray", func(checked bool) {
+		w.startMinimizedBinding.Set(checked)
+	})
+	startMinimizedCheck.Bind(w.startMinimizedBinding)
+
 	form := container.NewVBox(
 		promptLabel,
 		promptEntry,
+		layout.NewSpacer(),
 		widget.NewSeparator(),
+		layout.NewSpacer(),
 		container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry),
+		layout.NewSpacer(),
 		container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider),
+		layout.NewSpacer(),
 		widget.NewSeparator(),
+		layout.NewSpacer(),
+		startMinimizedCheck,
+		layout.NewSpacer(),
 		resetPromptBtn,
 	)
 
@@ -282,15 +363,21 @@ func (w *MainWindow) testAPIConnection() {
 			return
 		}
 
+		// Get Base URL from entry if OpenAI
+		baseURL := w.config.AIProvider.BaseURL
+		if provider == "openai" && w.baseURLEntry != nil {
+			baseURL = w.baseURLEntry.Text
+		}
+
 		// Create a test provider
 		var testProvider ai.Provider
 		switch provider {
 		case "openai":
-			testProvider = ai.NewOpenAIProvider(apiKey, w.config.AIProvider.BaseURL, model)
+			testProvider = ai.NewOpenAIProvider(apiKey, baseURL, model)
 		case "claude":
-			testProvider = ai.NewAnthropicProvider(apiKey, w.config.AIProvider.BaseURL, model)
+			testProvider = ai.NewAnthropicProvider(apiKey, baseURL, model)
 		case "gemini":
-			testProvider = ai.NewGeminiProvider(apiKey, w.config.AIProvider.BaseURL, model)
+			testProvider = ai.NewGeminiProvider(apiKey, baseURL, model)
 		default:
 			w.statusBinding.Set("Error: Unknown provider")
 			return
@@ -305,10 +392,15 @@ func (w *MainWindow) testAPIConnection() {
 
 		_, err := testProvider.ReviseText(ctx, testText, testPrompt)
 		if err != nil {
-			w.statusBinding.Set(fmt.Sprintf("Connection failed: %v", err))
+			// Truncate error message if too long
+			errMsg := err.Error()
+			if len(errMsg) > 100 {
+				errMsg = errMsg[:97] + "..."
+			}
+			w.statusBinding.Set(fmt.Sprintf("Connection failed: %s", errMsg))
 			logger.Error("API connection test failed", "error", err)
 		} else {
-			w.statusBinding.Set("Connection successful!")
+			w.statusBinding.Set("✓ Connection successful!")
 			logger.Info("API connection test successful")
 		}
 	}()
@@ -322,20 +414,38 @@ func (w *MainWindow) saveSettings() {
 	hotkeySelect, _ := w.hotkeySelectBinding.Get()
 	hotkeySelection, _ := w.hotkeySelectionBinding.Get()
 	prompt, _ := w.promptBinding.Get()
+	charLimitStr, _ := w.charLimitBinding.Get()
+	startMinimized, _ := w.startMinimizedBinding.Get()
 
+	// Parse character limit
+	charLimit, err := strconv.Atoi(charLimitStr)
+	if err != nil || charLimit <= 0 {
+		w.statusBinding.Set("Error: Invalid character limit")
+		return
+	}
+
+	// Update config
 	w.config.AIProvider.Provider = provider
 	w.config.AIProvider.Model = model
 	w.config.SaveAPIKey(provider, apiKey)
+
+	// Update Base URL if OpenAI
+	if provider == "openai" && w.baseURLEntry != nil {
+		w.config.AIProvider.BaseURL = w.baseURLEntry.Text
+	}
+
 	w.config.Hotkeys.SelectAll = hotkeySelect
 	w.config.Hotkeys.Selection = hotkeySelection
 	w.config.Revision.SystemPrompt = prompt
+	w.config.Revision.CharacterLimit = charLimit
+	w.config.Appearance.StartMinimized = startMinimized
 
 	// Save to disk
 	if err := w.config.Save(); err != nil {
-		w.statusBinding.Set("Error saving settings: " + err.Error())
+		w.statusBinding.Set("✗ Error saving settings: " + err.Error())
 		logger.Error("Failed to save settings", "error", err)
 	} else {
-		w.statusBinding.Set("Settings saved successfully")
+		w.statusBinding.Set("✓ Settings saved successfully")
 		logger.Info("Settings saved")
 	}
 }
