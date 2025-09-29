@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"strconv"
 	"time"
 
@@ -42,6 +43,7 @@ type MainWindow struct {
 	charLimitBinding       binding.String
 	statusBinding          binding.String
 	startMinimizedBinding  binding.Bool
+	themeBinding           binding.String
 
 	// UI containers for dynamic visibility
 	baseURLContainer *fyne.Container
@@ -67,6 +69,13 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.Hotkey
 	// Initialize data bindings
 	mw.initBindings()
 
+	// Apply theme from config
+	themeName := cfg.Appearance.Theme
+	if themeName == "" {
+		themeName = "auto"
+	}
+	mw.applyTheme(themeName)
+
 	// Create and set content
 	content := mw.createContent()
 	window.SetContent(content)
@@ -89,6 +98,7 @@ func (w *MainWindow) initBindings() {
 	w.charLimitBinding = binding.NewString()
 	w.statusBinding = binding.NewString()
 	w.startMinimizedBinding = binding.NewBool()
+	w.themeBinding = binding.NewString()
 
 	// Set initial values from config
 	currentProvider := w.config.GetCurrentProvider()
@@ -103,6 +113,13 @@ func (w *MainWindow) initBindings() {
 	w.charLimitBinding.Set(strconv.Itoa(w.config.Revision.CharacterLimit))
 	w.statusBinding.Set("Ready")
 	w.startMinimizedBinding.Set(w.config.Appearance.StartMinimized)
+
+	// Set theme, default to "auto" if empty
+	theme := w.config.Appearance.Theme
+	if theme == "" {
+		theme = "auto"
+	}
+	w.themeBinding.Set(theme)
 }
 
 // loadProviderSettings loads settings for a specific provider into the UI
@@ -133,6 +150,9 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 	// Revision Settings Section
 	revisionSection := w.createRevisionSection()
 
+	// System Settings Section
+	systemSection := w.createSystemSection()
+
 	// Status Bar
 	statusBar := w.createStatusBar()
 
@@ -141,6 +161,7 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 		container.NewTabItemWithIcon("AI Provider", theme.ComputerIcon(), providerSection),
 		container.NewTabItemWithIcon("Hotkeys", theme.SettingsIcon(), hotkeySection),
 		container.NewTabItemWithIcon("Revision", theme.DocumentIcon(), revisionSection),
+		container.NewTabItemWithIcon("System", theme.ViewFullScreenIcon(), systemSection),
 	)
 
 	// Save button
@@ -351,12 +372,6 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 		w.promptBinding.Set(config.GetDefaultRevision().SystemPrompt)
 	})
 
-	// Start Minimized checkbox
-	startMinimizedCheck := widget.NewCheck("Start minimized to system tray", func(checked bool) {
-		w.startMinimizedBinding.Set(checked)
-	})
-	startMinimizedCheck.Bind(w.startMinimizedBinding)
-
 	form := container.NewVBox(
 		container.NewPadded(promptLabel),
 		container.NewPadded(promptEntry),
@@ -364,8 +379,45 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 		container.NewPadded(container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry)),
 		container.NewPadded(container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider)),
 		widget.NewSeparator(),
-		container.NewPadded(startMinimizedCheck),
 		container.NewPadded(resetPromptBtn),
+	)
+
+	return container.NewScroll(form)
+}
+
+func (w *MainWindow) createSystemSection() fyne.CanvasObject {
+	// Theme selection
+	themeLabel := widget.NewLabel("Theme:")
+	themeLabel.TextStyle.Bold = true
+
+	themeSelect := widget.NewSelect(
+		[]string{"auto", "light", "dark"},
+		func(value string) {
+			w.themeBinding.Set(value)
+			w.applyTheme(value)
+		},
+	)
+
+	// Set initial selection
+	currentTheme, _ := w.themeBinding.Get()
+	themeSelect.SetSelected(currentTheme)
+
+	// Theme description
+	themeDesc := widget.NewLabel("Auto: Follow system theme\nLight: Always use light theme\nDark: Always use dark theme")
+	themeDesc.Wrapping = fyne.TextWrapWord
+
+	// Start Minimized checkbox
+	startMinimizedCheck := widget.NewCheck("Start minimized to system tray", func(checked bool) {
+		w.startMinimizedBinding.Set(checked)
+	})
+	startMinimizedCheck.Bind(w.startMinimizedBinding)
+
+	form := container.NewVBox(
+		container.NewPadded(themeLabel),
+		container.NewPadded(themeSelect),
+		container.NewPadded(themeDesc),
+		widget.NewSeparator(),
+		container.NewPadded(startMinimizedCheck),
 	)
 
 	return container.NewScroll(form)
@@ -452,6 +504,17 @@ func (w *MainWindow) testAPIConnection() {
 	}()
 }
 
+func (w *MainWindow) applyTheme(themeName string) {
+	switch themeName {
+	case "light":
+		w.app.Settings().SetTheme(&forceLight{})
+	case "dark":
+		w.app.Settings().SetTheme(&forceDark{})
+	case "auto":
+		w.app.Settings().SetTheme(theme.DefaultTheme())
+	}
+}
+
 func (w *MainWindow) saveSettings() {
 	// Update config from bindings
 	provider, _ := w.providerBinding.Get()
@@ -462,6 +525,7 @@ func (w *MainWindow) saveSettings() {
 	prompt, _ := w.promptBinding.Get()
 	charLimitStr, _ := w.charLimitBinding.Get()
 	startMinimized, _ := w.startMinimizedBinding.Get()
+	themeSetting, _ := w.themeBinding.Get()
 
 	// Parse character limit
 	charLimit, err := strconv.Atoi(charLimitStr)
@@ -503,6 +567,7 @@ func (w *MainWindow) saveSettings() {
 	w.config.Revision.SystemPrompt = prompt
 	w.config.Revision.CharacterLimit = charLimit
 	w.config.Appearance.StartMinimized = startMinimized
+	w.config.Appearance.Theme = themeSetting
 
 	// Save to disk
 	if err := w.config.Save(); err != nil {
@@ -520,4 +585,42 @@ func (w *MainWindow) saveSettings() {
 
 func (w *MainWindow) ShowAndRun() {
 	w.Window.ShowAndRun()
+}
+
+// Custom theme types to force light or dark theme
+
+type forceLight struct{}
+
+func (f *forceLight) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	return theme.DefaultTheme().Color(name, theme.VariantLight)
+}
+
+func (f *forceLight) Font(style fyne.TextStyle) fyne.Resource {
+	return theme.DefaultTheme().Font(style)
+}
+
+func (f *forceLight) Icon(name fyne.ThemeIconName) fyne.Resource {
+	return theme.DefaultTheme().Icon(name)
+}
+
+func (f *forceLight) Size(name fyne.ThemeSizeName) float32 {
+	return theme.DefaultTheme().Size(name)
+}
+
+type forceDark struct{}
+
+func (f *forceDark) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	return theme.DefaultTheme().Color(name, theme.VariantDark)
+}
+
+func (f *forceDark) Font(style fyne.TextStyle) fyne.Resource {
+	return theme.DefaultTheme().Font(style)
+}
+
+func (f *forceDark) Icon(name fyne.ThemeIconName) fyne.Resource {
+	return theme.DefaultTheme().Icon(name)
+}
+
+func (f *forceDark) Size(name fyne.ThemeSizeName) float32 {
+	return theme.DefaultTheme().Size(name)
 }
