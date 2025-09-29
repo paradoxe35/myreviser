@@ -38,7 +38,7 @@ func main() {
 	}
 
 	// Create Fyne application
-	myApp := app.NewWithID("com.myreviser.app")
+	myApp := app.NewWithID("me.pngwasi.myreviser")
 	myApp.Settings().SetTheme(&ui.MyReviserTheme{})
 
 	logger.Info("MyReviser starting", "version", Version, "build_time", BuildTime)

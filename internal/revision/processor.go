@@ -40,6 +40,18 @@ func NewProcessor(cfg *config.Config) (*Processor, error) {
 		return nil, err
 	}
 
+	// Register config change listener
+	config.RegisterListener(func(newCfg *config.Config) {
+		p.mu.Lock()
+		p.config = newCfg
+		p.mu.Unlock()
+
+		// Reinitialize providers with new config
+		if err := p.initializeProviders(); err != nil {
+			logger.Error("Failed to reinitialize providers on config change", "error", err)
+		}
+	})
+
 	return p, nil
 }
 
@@ -81,15 +93,20 @@ func (p *Processor) initializeProviders() error {
 // ProcessSelectAll processes text with select all
 func (p *Processor) ProcessSelectAll() error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if p.processing {
+		p.mu.Unlock()
 		logger.Warn("Already processing a revision")
-		return fmt.Errorf("already processing")
+		return fmt.Errorf("already processing a revision, please wait")
 	}
-
 	p.processing = true
-	defer func() { p.processing = false }()
+	p.mu.Unlock()
+
+	// Ensure we clear processing flag on exit
+	defer func() {
+		p.mu.Lock()
+		p.processing = false
+		p.mu.Unlock()
+	}()
 
 	logger.Info("Starting select all revision")
 
@@ -150,15 +167,20 @@ func (p *Processor) ProcessSelectAll() error {
 // ProcessSelection processes selected text
 func (p *Processor) ProcessSelection() error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if p.processing {
+		p.mu.Unlock()
 		logger.Warn("Already processing a revision")
-		return fmt.Errorf("already processing")
+		return fmt.Errorf("already processing a revision, please wait")
 	}
-
 	p.processing = true
-	defer func() { p.processing = false }()
+	p.mu.Unlock()
+
+	// Ensure we clear processing flag on exit
+	defer func() {
+		p.mu.Lock()
+		p.processing = false
+		p.mu.Unlock()
+	}()
 
 	logger.Info("Starting selection revision")
 
@@ -189,10 +211,14 @@ func (p *Processor) ProcessSelection() error {
 
 // reviseText sends text to the AI provider for revision
 func (p *Processor) reviseText(text string) (string, error) {
+	p.mu.Lock()
+	cfg := p.config
+	p.mu.Unlock()
+
 	// Check character limit
-	if len(text) > p.config.Revision.CharacterLimit {
+	if len(text) > cfg.Revision.CharacterLimit {
 		return "", fmt.Errorf("text exceeds character limit (%d > %d)",
-			len(text), p.config.Revision.CharacterLimit)
+			len(text), cfg.Revision.CharacterLimit)
 	}
 
 	// Get current provider
@@ -210,7 +236,7 @@ func (p *Processor) reviseText(text string) (string, error) {
 		"provider", provider.GetName(),
 		"text_length", len(text))
 
-	// Revise text
+	// Revise text with latest system prompt
 	revised, err := provider.ReviseText(ctx, text, p.config.Revision.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("AI revision failed: %w", err)

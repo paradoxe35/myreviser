@@ -1,13 +1,16 @@
 package ui
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/paradoxe35/myreviser-go/internal/ai"
 	"github.com/paradoxe35/myreviser-go/internal/config"
 	"github.com/paradoxe35/myreviser-go/internal/logger"
 )
@@ -268,10 +271,47 @@ func (w *MainWindow) updateProviderDefaults(provider string) {
 func (w *MainWindow) testAPIConnection() {
 	w.statusBinding.Set("Testing API connection...")
 
-	// TODO: Implement actual API test
-	// This would call the AI provider with a simple test prompt
+	go func() {
+		// Get current provider settings
+		provider, _ := w.providerBinding.Get()
+		apiKey, _ := w.apiKeyBinding.Get()
+		model, _ := w.modelBinding.Get()
 
-	w.statusBinding.Set("Connection test completed")
+		if apiKey == "" {
+			w.statusBinding.Set("Error: API key is required")
+			return
+		}
+
+		// Create a test provider
+		var testProvider ai.Provider
+		switch provider {
+		case "openai":
+			testProvider = ai.NewOpenAIProvider(apiKey, w.config.AIProvider.BaseURL, model)
+		case "claude":
+			testProvider = ai.NewAnthropicProvider(apiKey, w.config.AIProvider.BaseURL, model)
+		case "gemini":
+			testProvider = ai.NewGeminiProvider(apiKey, w.config.AIProvider.BaseURL, model)
+		default:
+			w.statusBinding.Set("Error: Unknown provider")
+			return
+		}
+
+		// Test the connection with a simple prompt
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		testText := "Hello"
+		testPrompt := "Reply with 'Connection successful' if you receive this message."
+
+		_, err := testProvider.ReviseText(ctx, testText, testPrompt)
+		if err != nil {
+			w.statusBinding.Set(fmt.Sprintf("Connection failed: %v", err))
+			logger.Error("API connection test failed", "error", err)
+		} else {
+			w.statusBinding.Set("Connection successful!")
+			logger.Info("API connection test successful")
+		}
+	}()
 }
 
 func (w *MainWindow) saveSettings() {

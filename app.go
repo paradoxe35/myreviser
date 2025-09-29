@@ -19,6 +19,7 @@ type Application struct {
 	config          *config.Config
 	hotkeyManager   *input.HotkeyManager
 	processor       *revision.Processor
+	notifications   *ui.NotificationManager
 }
 
 // NewApplication creates a new application instance
@@ -32,6 +33,9 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Create hotkey manager
 	hotkeyManager := input.NewHotkeyManager()
 
+	// Create notification manager
+	notifications := ui.NewNotificationManager(app)
+
 	// Create main window
 	mainWindow := ui.NewMainWindow(app, cfg)
 
@@ -41,6 +45,7 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 		config:        cfg,
 		hotkeyManager: hotkeyManager,
 		processor:     processor,
+		notifications: notifications,
 	}
 
 	// Setup hotkeys
@@ -70,17 +75,37 @@ func (a *Application) setupHotkeys() {
 	// Register handlers
 	a.hotkeyManager.RegisterHandler("select_all", func() {
 		logger.Info("Select all hotkey triggered")
+
+		// Check if already processing
+		if a.processor.IsProcessing() {
+			a.notifications.ShowInfo("Please Wait", "A revision is already in progress")
+			return
+		}
+
+		// Process without showing notification unless error occurs
 		if err := a.processor.ProcessSelectAll(); err != nil {
 			logger.Error("Failed to process select all", "error", err)
-			// TODO: Show notification to user
+			a.notifications.ShowError("Revision Failed", err.Error())
+		} else {
+			logger.Info("Text revised successfully")
 		}
 	})
 
 	a.hotkeyManager.RegisterHandler("selection", func() {
 		logger.Info("Selection hotkey triggered")
+
+		// Check if already processing
+		if a.processor.IsProcessing() {
+			a.notifications.ShowInfo("Please Wait", "A revision is already in progress")
+			return
+		}
+
+		// Process without showing notification unless error occurs
 		if err := a.processor.ProcessSelection(); err != nil {
 			logger.Error("Failed to process selection", "error", err)
-			// TODO: Show notification to user
+			a.notifications.ShowError("Revision Failed", err.Error())
+		} else {
+			logger.Info("Text revised successfully")
 		}
 	})
 }

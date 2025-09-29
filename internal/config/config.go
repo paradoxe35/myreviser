@@ -43,6 +43,8 @@ type AppearanceConfig struct {
 var (
 	currentConfig *Config
 	configMutex   sync.RWMutex
+	listeners     []func(*Config)
+	listenerMutex sync.RWMutex
 )
 
 // ConfigPath returns the path to the configuration file
@@ -188,5 +190,36 @@ func Update(fn func(*Config)) error {
 	}
 
 	fn(currentConfig)
-	return currentConfig.Save()
+	err := currentConfig.Save()
+	if err == nil {
+		// Notify listeners about config change
+		notifyListeners(currentConfig)
+	}
+	return err
+}
+
+// RegisterListener registers a callback to be called when config changes
+func RegisterListener(listener func(*Config)) {
+	listenerMutex.Lock()
+	defer listenerMutex.Unlock()
+	listeners = append(listeners, listener)
+}
+
+// notifyListeners notifies all registered listeners about config changes
+func notifyListeners(cfg *Config) {
+	listenerMutex.RLock()
+	defer listenerMutex.RUnlock()
+
+	for _, listener := range listeners {
+		go listener(cfg) // Run listeners in goroutines to avoid blocking
+	}
+}
+
+// Reload reloads the configuration from disk and notifies listeners
+func Reload() (*Config, error) {
+	cfg, err := Load()
+	if err == nil {
+		notifyListeners(cfg)
+	}
+	return cfg, err
 }

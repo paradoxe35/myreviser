@@ -1,0 +1,13 @@
+[Details]
+Icon = "assets/icon.png"
+Name = "MyReviser"
+ID = "me.pngwasi.myreviser"
+Version = "1.0.0"
+Build = 1
+
+[LinuxAndBSD]
+GenericName = "Text Revision Tool"
+Categories = ["Utility", "TextEditor"]
+Comment = "AI-powered text revision tool for improving grammar and clarity"
+Keywords = ["text", "revision", "ai", "grammar", "editor"]
+ExecParams = ""
