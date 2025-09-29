@@ -18,6 +18,7 @@ type HotkeyManager struct {
 	handlers         map[string]func()
 	hotkeys          map[string]*hotkey.Hotkey
 	active           bool
+	disabled         bool // Temporarily disabled (e.g., during hotkey capture)
 	stopChan         chan struct{}
 }
 

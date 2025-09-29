@@ -16,12 +16,16 @@ import (
 // HotkeyCapture is a custom widget for capturing keyboard shortcuts using Fyne's keyboard events
 type HotkeyCapture struct {
 	widget.BaseWidget
-	binding    binding.String
-	label      *widget.Label
-	captureBtn *widget.Button
-	clearBtn   *widget.Button
-	container  *fyne.Container
-	entry      *captureEntry // Hidden entry to capture keyboard events
+	binding        binding.String
+	label          *widget.Label
+	captureBtn     *widget.Button
+	stopBtn        *widget.Button
+	clearBtn       *widget.Button
+	container      *fyne.Container
+	entry          *captureEntry // Hidden entry to capture keyboard events
+	window         fyne.Window   // Reference to parent window for focus
+	onCaptureStart func()        // Callback when capture starts
+	onCaptureStop  func()        // Callback when capture stops
 
 	isCapturing bool
 	mu          sync.Mutex
@@ -70,17 +74,27 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 		h.startCapture()
 	})
 
+	// Create stop button (initially hidden)
+	h.stopBtn = widget.NewButtonWithIcon("Stop", theme.MediaStopIcon(), func() {
+		h.stopCapture()
+	})
+	h.stopBtn.Importance = widget.HighImportance
+	h.stopBtn.Hide()
+
 	// Create clear button
 	h.clearBtn = widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 		h.clearHotkey()
 	})
 	h.clearBtn.Importance = widget.LowImportance
 
+	// Create button container
+	buttonContainer := container.NewHBox(h.clearBtn, h.captureBtn, h.stopBtn)
+
 	// Create container
 	h.container = container.NewBorder(
 		nil, nil,
 		h.label,
-		container.NewHBox(h.clearBtn, h.captureBtn),
+		buttonContainer,
 		h.entry, // Hidden entry in center for keyboard capture
 	)
 
@@ -103,36 +117,58 @@ func (h *HotkeyCapture) startCapture() {
 	h.isCapturing = true
 	h.mu.Unlock()
 
+	// Notify that capture is starting (disable global hotkeys)
+	if h.onCaptureStart != nil {
+		h.onCaptureStart()
+	}
+
 	// Reset pressed keys
 	h.pressedKeys = make(map[fyne.KeyName]bool)
 	h.modifiers = make(map[fyne.KeyModifier]bool)
 
 	// Update UI
-	h.label.SetText("Press keys... (ESC to cancel)")
-	h.captureBtn.SetText("Listening...")
-	h.captureBtn.Disable()
+	h.label.SetText("Press keys... (ESC to cancel, Enter to save)")
+	h.captureBtn.Hide()
+	h.stopBtn.Show()
 
 	// Enable and focus the entry to capture keys
 	h.entry.Enable()
 	h.entry.SetText("")
-	// Note: Canvas focus would be set by the window
+
+	// Focus the entry widget so it receives keyboard events
+	if h.window != nil {
+		h.window.Canvas().Focus(h.entry)
+	}
 }
 
 // stopCapture stops listening for keys
 func (h *HotkeyCapture) stopCapture() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	if !h.isCapturing {
+		h.mu.Unlock()
 		return
 	}
 
 	h.isCapturing = false
+	h.mu.Unlock()
+
+	// Notify that capture is stopping (re-enable global hotkeys)
+	if h.onCaptureStop != nil {
+		h.onCaptureStop()
+	}
 
 	// Update UI
 	h.entry.Disable()
-	h.captureBtn.SetText("Capture")
-	h.captureBtn.Enable()
+	h.stopBtn.Hide()
+	h.captureBtn.Show()
+
+	// Restore previous value or show placeholder
+	currentValue, _ := h.binding.Get()
+	if currentValue != "" {
+		h.label.SetText(currentValue)
+	} else {
+		h.label.SetText("Click 'Capture' to set hotkey")
+	}
 }
 
 // handleKeyPress processes key press events from Fyne

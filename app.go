@@ -14,12 +14,12 @@ import (
 
 // Application represents the main application
 type Application struct {
-	app             fyne.App
-	mainWindow      *ui.MainWindow
-	config          *config.Config
-	hotkeyManager   *input.HotkeyManager
-	processor       *revision.Processor
-	notifications   *ui.NotificationManager
+	app           fyne.App
+	mainWindow    *ui.MainWindow
+	config        *config.Config
+	hotkeyManager *input.HotkeyManager
+	processor     *revision.Processor
+	notifications *ui.NotificationManager
 }
 
 // NewApplication creates a new application instance

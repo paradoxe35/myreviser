@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	defaultLogger *slog.Logger
+	defaultLogger  *slog.Logger
 	currentLogFile string
 )
 

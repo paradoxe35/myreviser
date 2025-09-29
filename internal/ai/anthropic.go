@@ -36,10 +36,10 @@ func NewAnthropicProvider(apiKey, baseURL, model string) *AnthropicProvider {
 
 // AnthropicRequest represents the request structure for Claude API
 type AnthropicRequest struct {
-	Model     string              `json:"model"`
-	Messages  []AnthropicMessage  `json:"messages"`
-	MaxTokens int                 `json:"max_tokens"`
-	System    string              `json:"system,omitempty"`
+	Model     string             `json:"model"`
+	Messages  []AnthropicMessage `json:"messages"`
+	MaxTokens int                `json:"max_tokens"`
+	System    string             `json:"system,omitempty"`
 }
 
 // AnthropicMessage represents a message in the Claude API

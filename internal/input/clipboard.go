@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"golang.design/x/clipboard"
 	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"golang.design/x/clipboard"
 )
 
 // ClipboardManager manages clipboard operations

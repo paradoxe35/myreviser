@@ -18,10 +18,10 @@ import (
 
 const (
 	// UI spacing constants
-	PaddingSmall  = 5
-	PaddingMedium = 10
-	PaddingLarge  = 20
-	MaxWindowWidth = 800
+	PaddingSmall    = 5
+	PaddingMedium   = 10
+	PaddingLarge    = 20
+	MaxWindowWidth  = 800
 	MaxWindowHeight = 600
 )
 
@@ -42,8 +42,8 @@ type MainWindow struct {
 	startMinimizedBinding  binding.Bool
 
 	// UI containers for dynamic visibility
-	baseURLContainer   *fyne.Container
-	baseURLEntry       *widget.Entry
+	baseURLContainer *fyne.Container
+	baseURLEntry     *widget.Entry
 }
 
 func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
@@ -148,8 +148,8 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 	content := container.NewBorder(
 		nil, // top
 		container.NewBorder(nil, nil, nil, saveBtn, statusBar), // bottom
-		nil, // left
-		nil, // right
+		nil,  // left
+		nil,  // right
 		tabs, // center
 	)
 
@@ -233,18 +233,21 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	// Select All Hotkey with capture widget
 	selectAllLabel := widget.NewLabel("Select All & Revise:")
 	selectAllCapture := NewHotkeyCapture(w.hotkeySelectBinding, "Click 'Capture' to set hotkey")
+	selectAllCapture.window = w.Window // Set window reference for focus
 
 	// Selection Hotkey with capture widget
 	selectionLabel := widget.NewLabel("Revise Selection:")
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
+	selectionCapture.window = w.Window // Set window reference for focus
 
 	// Hotkey instructions
 	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
 		"2. Press your desired key combination\n" +
-		"3. Release the keys to save\n" +
-		"4. Press ESC to cancel\n\n" +
+		"3. Press Enter to save or ESC to cancel\n" +
+		"4. Click 'Stop' to cancel capture\n\n" +
 		"Note: You must use at least one modifier key\n" +
 		"(Ctrl, Alt, Shift, or Super/Win/Cmd).\n\n" +
+		"Important: Global hotkeys are disabled during capture.\n" +
 		"Some combinations may be reserved by your OS.")
 	instructionsLabel.Wrapping = fyne.TextWrapWord
 	instructions := widget.NewCard("", "How to Capture Hotkeys", instructionsLabel)
