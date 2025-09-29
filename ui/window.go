@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/paradoxe35/myreviser-go/internal/ai"
@@ -189,7 +188,6 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 
 	// Create Base URL container for visibility control
 	w.baseURLContainer = container.NewVBox(
-		layout.NewSpacer(),
 		container.NewBorder(nil, nil, baseURLLabel, nil, w.baseURLEntry),
 	)
 
@@ -199,18 +197,13 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 	})
 
 	form := container.NewVBox(
-		container.NewBorder(nil, nil, providerLabel, nil, providerSelect),
-		layout.NewSpacer(),
+		container.NewPadded(container.NewBorder(nil, nil, providerLabel, nil, providerSelect)),
 		widget.NewSeparator(),
-		layout.NewSpacer(),
-		container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry),
-		layout.NewSpacer(),
-		container.NewBorder(nil, nil, modelLabel, nil, modelEntry),
-		w.baseURLContainer,
-		layout.NewSpacer(),
+		container.NewPadded(container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry)),
+		container.NewPadded(container.NewBorder(nil, nil, modelLabel, nil, modelEntry)),
+		container.NewPadded(w.baseURLContainer),
 		widget.NewSeparator(),
-		layout.NewSpacer(),
-		testBtn,
+		container.NewPadded(testBtn),
 	)
 
 	// Now set the initial provider selection (after container is created)
@@ -251,19 +244,14 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	})
 
 	form := container.NewVBox(
-		selectAllLabel,
-		selectAllCapture,
-		layout.NewSpacer(),
+		container.NewPadded(selectAllLabel),
+		container.NewPadded(selectAllCapture),
 		widget.NewSeparator(),
-		layout.NewSpacer(),
-		selectionLabel,
-		selectionCapture,
-		layout.NewSpacer(),
+		container.NewPadded(selectionLabel),
+		container.NewPadded(selectionCapture),
 		widget.NewSeparator(),
-		layout.NewSpacer(),
-		instructions,
-		layout.NewSpacer(),
-		resetBtn,
+		container.NewPadded(instructions),
+		container.NewPadded(resetBtn),
 	)
 
 	return container.NewScroll(form)
@@ -311,20 +299,14 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	startMinimizedCheck.Bind(w.startMinimizedBinding)
 
 	form := container.NewVBox(
-		promptLabel,
-		promptEntry,
-		layout.NewSpacer(),
+		container.NewPadded(promptLabel),
+		container.NewPadded(promptEntry),
 		widget.NewSeparator(),
-		layout.NewSpacer(),
-		container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry),
-		layout.NewSpacer(),
-		container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider),
-		layout.NewSpacer(),
+		container.NewPadded(container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry)),
+		container.NewPadded(container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider)),
 		widget.NewSeparator(),
-		layout.NewSpacer(),
-		startMinimizedCheck,
-		layout.NewSpacer(),
-		resetPromptBtn,
+		container.NewPadded(startMinimizedCheck),
+		container.NewPadded(resetPromptBtn),
 	)
 
 	return container.NewScroll(form)
