@@ -57,6 +57,8 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 	h.entry = &captureEntry{parent: h}
 	h.entry.PlaceHolder = placeholder
 	h.entry.Disable()
+	h.entry.TextStyle.Bold = true      // Make text bold for better visibility
+	h.entry.TextStyle.Monospace = true // Use monospace font for key combinations
 
 	// Update entry when binding changes
 	currentValue, _ := binding.Get()
@@ -296,6 +298,28 @@ func (h *HotkeyCapture) clearHotkey() {
 	h.binding.Set("")
 	h.entry.SetText("")
 	h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
+}
+
+// StopCapture stops capture if currently capturing (public method for external use)
+func (h *HotkeyCapture) StopCapture() {
+	h.mu.Lock()
+	isCapturing := h.isCapturing
+	h.mu.Unlock()
+
+	if isCapturing {
+		h.stopCapture()
+	}
+}
+
+// UpdateFromBinding updates the display from the binding value
+func (h *HotkeyCapture) UpdateFromBinding() {
+	currentValue, _ := h.binding.Get()
+	if currentValue != "" {
+		h.entry.SetText(currentValue)
+	} else {
+		h.entry.SetText("")
+		h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
+	}
 }
 
 // Helper functions

@@ -164,6 +164,7 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 
 	// Provider selection
 	providerLabel := widget.NewLabel("AI Provider:")
+	providerLabel.TextStyle.Bold = true
 	providerSelect := widget.NewSelect(
 		[]string{"openai", "claude", "gemini"},
 		func(value string) {
@@ -185,25 +186,28 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 
 	// API Key
 	apiKeyLabel := widget.NewLabel("API Key:")
+	apiKeyLabel.TextStyle.Bold = true
 	apiKeyEntry := widget.NewPasswordEntry()
 	apiKeyEntry.Bind(w.apiKeyBinding)
 	apiKeyEntry.PlaceHolder = "Enter your API key"
 
 	// Model
 	modelLabel := widget.NewLabel("Model (optional):")
+	modelLabel.TextStyle.Bold = true
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
 	modelEntry.PlaceHolder = "e.g., gpt-4o-mini"
 
 	// Base URL (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL (optional):")
+	baseURLLabel.TextStyle.Bold = true
 	w.baseURLEntry = widget.NewEntry()
 	// Base URL will be loaded by loadProviderSettings
 	w.baseURLEntry.PlaceHolder = "Default: https://api.openai.com/v1"
 
 	// Create Base URL container for visibility control
 	w.baseURLContainer = container.NewVBox(
-		container.NewBorder(nil, nil, baseURLLabel, nil, w.baseURLEntry),
+		container.NewPadded(container.NewBorder(nil, nil, baseURLLabel, nil, w.baseURLEntry)),
 	)
 
 	// Test connection button
@@ -211,13 +215,25 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		w.testAPIConnection()
 	})
 
+	// Add spacing between sections
+	spacer := func() fyne.CanvasObject {
+		return container.NewPadded(widget.NewLabel(""))
+	}
+
 	form := container.NewVBox(
+		spacer(), // Top spacing
 		container.NewPadded(container.NewBorder(nil, nil, providerLabel, nil, providerSelect)),
+		spacer(),
 		widget.NewSeparator(),
+		spacer(),
 		container.NewPadded(container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry)),
+		spacer(),
 		container.NewPadded(container.NewBorder(nil, nil, modelLabel, nil, modelEntry)),
-		container.NewPadded(w.baseURLContainer),
+		spacer(),
+		w.baseURLContainer,
+		spacer(),
 		widget.NewSeparator(),
+		spacer(),
 		container.NewPadded(testBtn),
 	)
 
@@ -235,6 +251,7 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	// Select All Hotkey with capture widget
 	selectAllLabel := widget.NewLabel("Select All & Revise:")
+	selectAllLabel.TextStyle.Bold = true
 	selectAllCapture := NewHotkeyCapture(w.hotkeySelectBinding, "Click 'Capture' to set hotkey")
 	selectAllCapture.window = w.Window // Set window reference for focus
 	// Connect callbacks to disable/enable global hotkeys during capture
@@ -251,6 +268,7 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 
 	// Selection Hotkey with capture widget
 	selectionLabel := widget.NewLabel("Revise Selection:")
+	selectionLabel.TextStyle.Bold = true
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 	selectionCapture.window = w.Window // Set window reference for focus
 	// Connect callbacks to disable/enable global hotkeys during capture
@@ -279,9 +297,18 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 
 	// Reset to defaults button
 	resetBtn := widget.NewButton("Reset to Defaults", func() {
+		// Stop any active captures
+		selectAllCapture.StopCapture()
+		selectionCapture.StopCapture()
+
+		// Set default values
 		defaults := config.GetPlatformHotkeys()
 		w.hotkeySelectBinding.Set(defaults.SelectAll)
 		w.hotkeySelectionBinding.Set(defaults.Selection)
+
+		// Update displays
+		selectAllCapture.UpdateFromBinding()
+		selectionCapture.UpdateFromBinding()
 	})
 
 	form := container.NewVBox(
