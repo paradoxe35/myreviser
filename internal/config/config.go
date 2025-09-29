@@ -17,11 +17,15 @@ type Config struct {
 	Appearance AppearanceConfig `json:"appearance"`
 }
 
+type ProviderSettings struct {
+	APIKey  string `json:"api_key"`
+	BaseURL string `json:"base_url,omitempty"`
+	Model   string `json:"model,omitempty"`
+}
+
 type AIProviderConfig struct {
-	Provider string `json:"provider"` // "openai" | "claude" | "gemini"
-	APIKey   string `json:"api_key"`
-	BaseURL  string `json:"base_url,omitempty"`
-	Model    string `json:"model,omitempty"`
+	Provider  string                      `json:"provider"` // "openai" | "claude" | "gemini"
+	Providers map[string]ProviderSettings `json:"providers"`
 }
 
 type HotkeyConfig struct {
@@ -58,8 +62,20 @@ func Default() *Config {
 	return &Config{
 		AIProvider: AIProviderConfig{
 			Provider: "openai",
-			BaseURL:  "https://api.openai.com/v1",
-			Model:    "gpt-4o-mini",
+			Providers: map[string]ProviderSettings{
+				"openai": {
+					BaseURL: "https://api.openai.com/v1",
+					Model:   "gpt-4o-mini",
+				},
+				"claude": {
+					BaseURL: "https://api.anthropic.com",
+					Model:   "claude-3-5-haiku-20241022",
+				},
+				"gemini": {
+					BaseURL: "https://generativelanguage.googleapis.com",
+					Model:   "gemini-2.0-flash-exp",
+				},
+			},
 		},
 		Hotkeys:    GetPlatformHotkeys(),
 		Revision:   GetDefaultRevision(),
@@ -159,16 +175,24 @@ func Load() (*Config, error) {
 // Save saves the configuration to disk
 func (c *Config) Save() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
+		c.mu.Unlock()
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
 	if err := os.WriteFile(ConfigPath(), data, 0644); err != nil {
+		c.mu.Unlock()
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
+	c.mu.Unlock()
+
+	// Update global config and notify listeners
+	configMutex.Lock()
+	currentConfig = c
+	configMutex.Unlock()
+
+	notifyListeners(c)
 
 	return nil
 }
@@ -222,4 +246,52 @@ func Reload() (*Config, error) {
 		notifyListeners(cfg)
 	}
 	return cfg, err
+}
+
+// GetProviderSettings returns settings for a specific provider
+func (c *Config) GetProviderSettings(provider string) ProviderSettings {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.AIProvider.Providers == nil {
+		return ProviderSettings{}
+	}
+
+	settings, ok := c.AIProvider.Providers[provider]
+	if !ok {
+		// Return defaults for this provider
+		defaults := Default()
+		if defaultSettings, ok := defaults.AIProvider.Providers[provider]; ok {
+			return defaultSettings
+		}
+		return ProviderSettings{}
+	}
+
+	return settings
+}
+
+// SetProviderSettings updates settings for a specific provider
+func (c *Config) SetProviderSettings(provider string, settings ProviderSettings) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.AIProvider.Providers == nil {
+		c.AIProvider.Providers = make(map[string]ProviderSettings)
+	}
+
+	c.AIProvider.Providers[provider] = settings
+}
+
+// GetCurrentProvider returns the currently selected provider name
+func (c *Config) GetCurrentProvider() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.AIProvider.Provider
+}
+
+// SetCurrentProvider sets the currently selected provider
+func (c *Config) SetCurrentProvider(provider string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.AIProvider.Provider = provider
 }

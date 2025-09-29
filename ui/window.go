@@ -88,19 +88,36 @@ func (w *MainWindow) initBindings() {
 	w.startMinimizedBinding = binding.NewBool()
 
 	// Set initial values from config
-	w.providerBinding.Set(w.config.AIProvider.Provider)
+	currentProvider := w.config.GetCurrentProvider()
+	w.providerBinding.Set(currentProvider)
 
-	// Decrypt API key for display
-	apiKey, _ := w.config.GetAPIKey()
-	w.apiKeyBinding.Set(apiKey)
+	// Load settings for current provider
+	w.loadProviderSettings(currentProvider)
 
-	w.modelBinding.Set(w.config.AIProvider.Model)
 	w.hotkeySelectBinding.Set(w.config.Hotkeys.SelectAll)
 	w.hotkeySelectionBinding.Set(w.config.Hotkeys.Selection)
 	w.promptBinding.Set(w.config.Revision.SystemPrompt)
 	w.charLimitBinding.Set(strconv.Itoa(w.config.Revision.CharacterLimit))
 	w.statusBinding.Set("Ready")
 	w.startMinimizedBinding.Set(w.config.Appearance.StartMinimized)
+}
+
+// loadProviderSettings loads settings for a specific provider into the UI
+func (w *MainWindow) loadProviderSettings(provider string) {
+	// Get provider settings
+	settings := w.config.GetProviderSettings(provider)
+
+	// Decrypt and load API key
+	apiKey, _ := w.config.GetAPIKey(provider)
+	w.apiKeyBinding.Set(apiKey)
+
+	// Load model and base URL
+	w.modelBinding.Set(settings.Model)
+
+	// Update base URL entry if it exists
+	if w.baseURLEntry != nil {
+		w.baseURLEntry.SetText(settings.BaseURL)
+	}
 }
 
 func (w *MainWindow) createContent() fyne.CanvasObject {
@@ -148,7 +165,9 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		[]string{"openai", "claude", "gemini"},
 		func(value string) {
 			w.providerBinding.Set(value)
-			w.updateProviderDefaults(value)
+
+			// Load settings for the selected provider
+			w.loadProviderSettings(value)
 
 			// Show/hide Base URL based on provider
 			if w.baseURLContainer != nil {
@@ -176,7 +195,7 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 	// Base URL (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL (optional):")
 	w.baseURLEntry = widget.NewEntry()
-	w.baseURLEntry.SetText(w.config.AIProvider.BaseURL)
+	// Base URL will be loaded by loadProviderSettings
 	w.baseURLEntry.PlaceHolder = "Default: https://api.openai.com/v1"
 
 	// Create Base URL container for visibility control
@@ -309,25 +328,19 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 func (w *MainWindow) createStatusBar() fyne.CanvasObject {
 	statusLabel := widget.NewLabel("")
 	statusLabel.Bind(w.statusBinding)
+	statusLabel.Wrapping = fyne.TextWrapWord
+	statusLabel.Truncation = fyne.TextTruncateEllipsis
 
-	return container.NewHBox(
+	// Create a scrollable container for long status messages
+	statusScroll := container.NewScroll(statusLabel)
+	statusScroll.SetMinSize(fyne.NewSize(550, 40))
+
+	return container.NewBorder(
+		nil, nil,
 		widget.NewIcon(theme.InfoIcon()),
-		statusLabel,
+		nil,
+		statusScroll,
 	)
-}
-
-func (w *MainWindow) updateProviderDefaults(provider string) {
-	switch provider {
-	case "openai":
-		w.modelBinding.Set("gpt-4o-mini")
-		w.config.AIProvider.BaseURL = "https://api.openai.com/v1"
-	case "claude":
-		w.modelBinding.Set("claude-3-5-haiku-20241022")
-		w.config.AIProvider.BaseURL = "https://api.anthropic.com"
-	case "gemini":
-		w.modelBinding.Set("gemini-2.5-flash-lite")
-		w.config.AIProvider.BaseURL = "https://generativelanguage.googleapis.com"
-	}
 }
 
 func (w *MainWindow) testAPIConnection() {
@@ -344,10 +357,16 @@ func (w *MainWindow) testAPIConnection() {
 			return
 		}
 
-		// Get Base URL from entry if OpenAI
-		baseURL := w.config.AIProvider.BaseURL
-		if provider == "openai" && w.baseURLEntry != nil {
+		// Get Base URL from entry
+		baseURL := ""
+		if w.baseURLEntry != nil {
 			baseURL = w.baseURLEntry.Text
+		}
+
+		// Fallback to provider defaults if not set
+		if baseURL == "" {
+			settings := w.config.GetProviderSettings(provider)
+			baseURL = settings.BaseURL
 		}
 
 		// Create a test provider
@@ -373,12 +392,12 @@ func (w *MainWindow) testAPIConnection() {
 
 		_, err := testProvider.ReviseText(ctx, testText, testPrompt)
 		if err != nil {
-			// Truncate error message if too long
+			// Truncate error message if too long (limit to 80 chars)
 			errMsg := err.Error()
-			if len(errMsg) > 100 {
-				errMsg = errMsg[:97] + "..."
+			if len(errMsg) > 80 {
+				errMsg = errMsg[:77] + "..."
 			}
-			w.statusBinding.Set(fmt.Sprintf("Connection failed: %s", errMsg))
+			w.statusBinding.Set(fmt.Sprintf("✗ Connection failed: %s", errMsg))
 			logger.Error("API connection test failed", "error", err)
 		} else {
 			w.statusBinding.Set("✓ Connection successful!")
@@ -405,16 +424,34 @@ func (w *MainWindow) saveSettings() {
 		return
 	}
 
-	// Update config
-	w.config.AIProvider.Provider = provider
-	w.config.AIProvider.Model = model
-	w.config.SaveAPIKey(provider, apiKey)
-
-	// Update Base URL if OpenAI
-	if provider == "openai" && w.baseURLEntry != nil {
-		w.config.AIProvider.BaseURL = w.baseURLEntry.Text
+	// Get base URL from entry
+	baseURL := ""
+	if w.baseURLEntry != nil {
+		baseURL = w.baseURLEntry.Text
 	}
 
+	// Update provider-specific settings
+	settings := config.ProviderSettings{
+		Model:   model,
+		BaseURL: baseURL,
+	}
+	w.config.SetProviderSettings(provider, settings)
+
+	// Save API key for this provider
+	if err := w.config.SaveAPIKey(provider, apiKey); err != nil {
+		errMsg := err.Error()
+		if len(errMsg) > 60 {
+			errMsg = errMsg[:57] + "..."
+		}
+		w.statusBinding.Set("✗ Error saving API key: " + errMsg)
+		logger.Error("Failed to save API key", "error", err)
+		return
+	}
+
+	// Set current provider
+	w.config.SetCurrentProvider(provider)
+
+	// Update other settings
 	w.config.Hotkeys.SelectAll = hotkeySelect
 	w.config.Hotkeys.Selection = hotkeySelection
 	w.config.Revision.SystemPrompt = prompt
@@ -423,7 +460,11 @@ func (w *MainWindow) saveSettings() {
 
 	// Save to disk
 	if err := w.config.Save(); err != nil {
-		w.statusBinding.Set("✗ Error saving settings: " + err.Error())
+		errMsg := err.Error()
+		if len(errMsg) > 60 {
+			errMsg = errMsg[:57] + "..."
+		}
+		w.statusBinding.Set("✗ Error saving settings: " + errMsg)
 		logger.Error("Failed to save settings", "error", err)
 	} else {
 		w.statusBinding.Set("✓ Settings saved successfully")

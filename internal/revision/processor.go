@@ -59,34 +59,40 @@ func NewProcessor(cfg *config.Config) (*Processor, error) {
 func (p *Processor) initializeProviders() error {
 	cfg := p.config
 
-	// Get decrypted API key
-	apiKey, err := cfg.GetAPIKey()
+	// Get current provider name
+	currentProvider := cfg.GetCurrentProvider()
+
+	// Get decrypted API key for current provider
+	apiKey, err := cfg.GetCurrentAPIKey()
 	if err != nil {
 		return fmt.Errorf("failed to get API key: %w", err)
 	}
 
+	// Get provider settings
+	settings := cfg.GetProviderSettings(currentProvider)
+
 	// Register providers based on configuration
-	switch cfg.AIProvider.Provider {
+	switch currentProvider {
 	case "openai":
-		provider := ai.NewOpenAIProvider(apiKey, cfg.AIProvider.BaseURL, cfg.AIProvider.Model)
+		provider := ai.NewOpenAIProvider(apiKey, settings.BaseURL, settings.Model)
 		p.providerFactory.Register("openai", provider)
 		p.providerFactory.SetCurrent("openai")
 
 	case "claude":
-		provider := ai.NewAnthropicProvider(apiKey, cfg.AIProvider.BaseURL, cfg.AIProvider.Model)
+		provider := ai.NewAnthropicProvider(apiKey, settings.BaseURL, settings.Model)
 		p.providerFactory.Register("claude", provider)
 		p.providerFactory.SetCurrent("claude")
 
 	case "gemini":
-		provider := ai.NewGeminiProvider(apiKey, cfg.AIProvider.BaseURL, cfg.AIProvider.Model)
+		provider := ai.NewGeminiProvider(apiKey, settings.BaseURL, settings.Model)
 		p.providerFactory.Register("gemini", provider)
 		p.providerFactory.SetCurrent("gemini")
 
 	default:
-		return fmt.Errorf("unknown provider: %s", cfg.AIProvider.Provider)
+		return fmt.Errorf("unknown provider: %s", currentProvider)
 	}
 
-	logger.Info("AI provider initialized", "provider", cfg.AIProvider.Provider)
+	logger.Info("AI provider initialized", "provider", currentProvider)
 	return nil
 }
 

@@ -90,7 +90,7 @@ func DecryptAPIKey(encryptedKey string) (string, error) {
 	return string(plaintext), nil
 }
 
-// SaveAPIKey saves an encrypted API key
+// SaveAPIKey saves an encrypted API key for a specific provider
 func (c *Config) SaveAPIKey(provider, apiKey string) error {
 	encrypted, err := EncryptAPIKey(apiKey)
 	if err != nil {
@@ -98,18 +98,33 @@ func (c *Config) SaveAPIKey(provider, apiKey string) error {
 	}
 
 	c.mu.Lock()
-	c.AIProvider.Provider = provider
-	c.AIProvider.APIKey = encrypted
+	if c.AIProvider.Providers == nil {
+		c.AIProvider.Providers = make(map[string]ProviderSettings)
+	}
+
+	settings := c.AIProvider.Providers[provider]
+	settings.APIKey = encrypted
+	c.AIProvider.Providers[provider] = settings
 	c.mu.Unlock()
 
 	return c.Save()
 }
 
-// GetAPIKey retrieves and decrypts the API key
-func (c *Config) GetAPIKey() (string, error) {
+// GetAPIKey retrieves and decrypts the API key for a specific provider
+func (c *Config) GetAPIKey(provider string) (string, error) {
 	c.mu.RLock()
-	encrypted := c.AIProvider.APIKey
+	var encrypted string
+	if c.AIProvider.Providers != nil {
+		if settings, ok := c.AIProvider.Providers[provider]; ok {
+			encrypted = settings.APIKey
+		}
+	}
 	c.mu.RUnlock()
 
 	return DecryptAPIKey(encrypted)
+}
+
+// GetCurrentAPIKey retrieves the API key for the currently selected provider
+func (c *Config) GetCurrentAPIKey() (string, error) {
+	return c.GetAPIKey(c.GetCurrentProvider())
 }
