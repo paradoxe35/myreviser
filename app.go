@@ -51,7 +51,12 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Setup hotkeys
 	application.setupHotkeys()
 
-	// Setup window close intercept (before system tray)
+	// Setup system tray if available
+	if desk, ok := app.(desktop.App); ok {
+		ui.SetupSystemTray(desk, mainWindow)
+	}
+
+	// Setup window close intercept
 	mainWindow.SetCloseIntercept(func() {
 		mainWindow.Hide()
 	})
@@ -107,14 +112,6 @@ func (a *Application) setupHotkeys() {
 
 // Start starts the application
 func (a *Application) Start() error {
-	// Setup system tray if available (must be done before app.Run())
-	if desk, ok := a.app.(desktop.App); ok {
-		logger.Info("Desktop app detected, setting up system tray")
-		ui.SetupSystemTray(desk, a.mainWindow, resourceIconPng)
-	} else {
-		logger.Warn("Not a desktop app, system tray unavailable")
-	}
-
 	// Start hotkey manager
 	if err := a.hotkeyManager.Start(); err != nil {
 		return fmt.Errorf("failed to start hotkey manager: %w", err)

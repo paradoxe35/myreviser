@@ -59,16 +59,10 @@ func (h *HotkeyManager) Start() error {
 		return fmt.Errorf("hotkey manager already active")
 	}
 
-	// Register hotkeys before starting
-	h.registerHotkey(h.selectAllBinding, "select_all")
-	h.registerHotkey(h.selectionBinding, "selection")
-
 	h.active = true
 	go h.listenForHotkeys()
 
-	logger.Info("Hotkey manager started",
-		"select_all", h.selectAllBinding,
-		"selection", h.selectionBinding)
+	logger.Info("Hotkey manager started")
 	return nil
 }
 
@@ -90,11 +84,26 @@ func (h *HotkeyManager) Stop() {
 
 // listenForHotkeys listens for configured hotkeys
 func (h *HotkeyManager) listenForHotkeys() {
+	// Add panic recovery for gohook failures (e.g., X11 display issues)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Hotkey listener panic recovered", "error", r)
+			h.mu.Lock()
+			h.active = false
+			h.mu.Unlock()
+		}
+	}()
+
 	// Start the hook
+	logger.Info("Starting hotkey listener")
 	h.hook = gohook.Start()
 	defer gohook.End()
 
-	logger.Info("Starting hotkey listener")
+	logger.Info("Hotkey listener initialized successfully")
+
+	// Register hotkeys
+	h.registerHotkey(h.selectAllBinding, "select_all")
+	h.registerHotkey(h.selectionBinding, "selection")
 
 	// Process events
 	for {
@@ -103,90 +112,36 @@ func (h *HotkeyManager) listenForHotkeys() {
 			logger.Info("Hotkey listener stopped")
 			return
 		case evt := <-h.hook:
-			h.handleEvent(evt)
+			if evt.Kind == gohook.KeyDown || evt.Kind == gohook.KeyHold {
+				h.handleEvent(evt)
+			}
 		}
 	}
 }
 
 // registerHotkey registers a single hotkey
-func (h *HotkeyManager) registerHotkey(binding, action string) error {
+func (h *HotkeyManager) registerHotkey(binding, action string) {
 	if binding == "" {
-		return fmt.Errorf("empty binding")
+		return
 	}
 
 	keys := parseHotkeyString(binding)
 	if len(keys) == 0 {
 		logger.Error("Invalid hotkey binding", "binding", binding)
-		return fmt.Errorf("invalid hotkey binding: %s", binding)
+		return
 	}
 
-	// Store the mapping for manual event handling
-	h.mu.Lock()
-	if h.handlers == nil {
-		h.handlers = make(map[string]func())
-	}
-	// Create a key signature for this binding
-	keySignature := strings.Join(keys, "+")
-	h.mu.Unlock()
+	// Register with gohook
+	gohook.Register(gohook.KeyDown, keys, func(e gohook.Event) {
+		h.triggerHandler(action)
+	})
 
-	logger.Info("Hotkey registered", "binding", binding, "action", action, "keys", keySignature)
-	return nil
+	logger.Info("Hotkey registered", "binding", binding, "action", action)
 }
 
 // handleEvent processes keyboard events
 func (h *HotkeyManager) handleEvent(evt gohook.Event) {
-	// Only handle key down events
-	if evt.Kind != gohook.KeyDown {
-		return
-	}
-
-	// Check modifiers
-	if evt.Rawcode == 0 {
-		return
-	}
-
-	// Map rawcode to key string (simplified - expand as needed)
-	keyName := ""
-	switch evt.Rawcode {
-	case 57: // Space
-		keyName = "space"
-	case 29: // Left Ctrl
-		keyName = "ctrl"
-	case 56: // Left Alt
-		keyName = "alt"
-	case 42: // Left Shift
-		keyName = "shift"
-	default:
-		// Try to get the key name from Keychar
-		if evt.Keychar != 0 {
-			keyName = string(rune(evt.Keychar))
-		}
-	}
-
-	if keyName != "" {
-		logger.Debug("Key event detected", "key", keyName, "rawcode", evt.Rawcode, "modifiers", evt.Mask)
-
-		// Check if this matches any registered hotkey
-		h.mu.RLock()
-		selectAll := h.selectAllBinding
-		selection := h.selectionBinding
-		h.mu.RUnlock()
-
-		// Simple matching logic - can be improved
-		// This is a basic implementation
-		if matchesHotkey(evt, selectAll) {
-			h.triggerHandler("select_all")
-		} else if matchesHotkey(evt, selection) {
-			h.triggerHandler("selection")
-		}
-	}
-}
-
-// matchesHotkey checks if an event matches a hotkey string
-func matchesHotkey(evt gohook.Event, hotkeyStr string) bool {
-	// This is a simplified matching - needs proper implementation
-	// based on your hotkey string format
-	return false // Placeholder
+	// Event handling is done via registered callbacks
 }
 
 // triggerHandler triggers a registered handler
