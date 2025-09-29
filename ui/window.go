@@ -216,10 +216,13 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 	})
 
 	form := container.NewVBox(
-		container.NewPadded(container.NewBorder(nil, nil, providerLabel, nil, providerSelect)),
+		container.NewPadded(providerLabel),
+		container.NewPadded(providerSelect),
 		widget.NewSeparator(),
-		container.NewPadded(container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry)),
-		container.NewPadded(container.NewBorder(nil, nil, modelLabel, nil, modelEntry)),
+		container.NewPadded(apiKeyLabel),
+		container.NewPadded(apiKeyEntry),
+		container.NewPadded(modelLabel),
+		container.NewPadded(modelEntry),
 		w.baseURLContainer,
 		widget.NewSeparator(),
 		container.NewPadded(testBtn),
