@@ -5,12 +5,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-
-	"gopkg.in/natefinch/lumberjack.v2"
+	"time"
 )
 
-var defaultLogger *slog.Logger
+var (
+	defaultLogger *slog.Logger
+	currentLogFile string
+)
 
+// Init initializes the logger with daily log rotation
 func Init() error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -22,15 +25,15 @@ func Init() error {
 		return fmt.Errorf("failed to create log directory: %w", err)
 	}
 
-	logFile := filepath.Join(logDir, "myreviser.log")
+	// Use daily log file format: myreviser-2025-09-29.log
+	today := time.Now().Format("2006-01-02")
+	logFile := filepath.Join(logDir, fmt.Sprintf("myreviser-%s.log", today))
+	currentLogFile = logFile
 
-	// Create rotating file writer
-	fileWriter := &lumberjack.Logger{
-		Filename:   logFile,
-		MaxSize:    10, // megabytes
-		MaxBackups: 3,
-		MaxAge:     30, // days
-		Compress:   true,
+	// Open log file with append mode
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
 	}
 
 	// Create text handler with options
@@ -38,11 +41,17 @@ func Init() error {
 		Level: slog.LevelInfo,
 	}
 
-	handler := slog.NewTextHandler(fileWriter, opts)
+	handler := slog.NewTextHandler(file, opts)
 	defaultLogger = slog.New(handler)
 
 	// Set as default
 	slog.SetDefault(defaultLogger)
+
+	// Log initialization
+	defaultLogger.Info("Logger initialized", "log_file", logFile)
+
+	// Clean up old log files (keep last 30 days)
+	go cleanupOldLogs(logDir, 30)
 
 	return nil
 }
@@ -74,12 +83,51 @@ func Warn(msg string, args ...any) {
 
 // GetCurrentLogFile returns the path to the current log file
 func GetCurrentLogFile() string {
+	if currentLogFile != "" {
+		return currentLogFile
+	}
+	// Fallback: construct path with today's date
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".myreviser", "logs", "myreviser.log")
+	today := time.Now().Format("2006-01-02")
+	return filepath.Join(homeDir, ".myreviser", "logs", fmt.Sprintf("myreviser-%s.log", today))
 }
 
 // GetLogDirectory returns the path to the logs directory
 func GetLogDirectory() string {
 	homeDir, _ := os.UserHomeDir()
 	return filepath.Join(homeDir, ".myreviser", "logs")
+}
+
+// cleanupOldLogs removes log files older than the specified number of days
+func cleanupOldLogs(logDir string, maxAgeDays int) {
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return
+	}
+
+	cutoffDate := time.Now().AddDate(0, 0, -maxAgeDays)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		// Check if it's a log file matching our pattern
+		if filepath.Ext(entry.Name()) != ".log" {
+			continue
+		}
+
+		logPath := filepath.Join(logDir, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		// Remove if older than cutoff date
+		if info.ModTime().Before(cutoffDate) {
+			if err := os.Remove(logPath); err == nil {
+				Info("Removed old log file", "file", entry.Name())
+			}
+		}
+	}
 }

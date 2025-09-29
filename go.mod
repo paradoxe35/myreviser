@@ -8,7 +8,6 @@ require (
 	github.com/go-vgo/robotgo v0.110.8
 	github.com/robotn/gohook v0.42.2
 	golang.design/x/clipboard v0.7.1
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
