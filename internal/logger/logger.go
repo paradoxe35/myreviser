@@ -37,8 +37,14 @@ func Init() error {
 	}
 
 	// Create text handler with options
+	// Check for DEBUG environment variable
+	logLevel := slog.LevelInfo
+	if os.Getenv("DEBUG") != "" {
+		logLevel = slog.LevelDebug
+	}
+
 	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: logLevel,
 	}
 
 	handler := slog.NewTextHandler(file, opts)

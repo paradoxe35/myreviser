@@ -94,27 +94,33 @@ func (h *HotkeyManager) listenForHotkeys() {
 		}
 	}()
 
-	// Start the hook
-	logger.Info("Starting hotkey listener")
-	h.hook = gohook.Start()
-	defer gohook.End()
-
-	logger.Info("Hotkey listener initialized successfully")
-
-	// Register hotkeys
+	// Register hotkeys BEFORE starting the hook
+	logger.Info("Registering hotkeys before starting listener")
 	h.registerHotkey(h.selectAllBinding, "select_all")
 	h.registerHotkey(h.selectionBinding, "selection")
 
-	// Process events
+	// Start the hook
+	logger.Info("Starting gohook event listener")
+	h.hook = gohook.Start()
+	defer gohook.End()
+
+	logger.Info("Hotkey listener initialized successfully, processing events")
+
+	// Process events - read from channel directly
 	for {
 		select {
 		case <-h.stopChan:
-			logger.Info("Hotkey listener stopped")
+			logger.Info("Hotkey listener stopped by stop signal")
 			return
-		case evt := <-h.hook:
-			if evt.Kind == gohook.KeyDown || evt.Kind == gohook.KeyHold {
-				h.handleEvent(evt)
-			}
+		case ev := <-h.hook:
+			// Log all events for debugging
+			logger.Debug("Event received",
+				"kind", ev.Kind,
+				"rawcode", ev.Rawcode,
+				"keychar", string(rune(ev.Keychar)),
+				"button", ev.Button,
+				"mask", ev.Mask)
+			// Note: Registered callbacks are triggered automatically by gohook
 		}
 	}
 }
@@ -122,6 +128,7 @@ func (h *HotkeyManager) listenForHotkeys() {
 // registerHotkey registers a single hotkey
 func (h *HotkeyManager) registerHotkey(binding, action string) {
 	if binding == "" {
+		logger.Warn("Empty hotkey binding", "action", action)
 		return
 	}
 
@@ -131,17 +138,15 @@ func (h *HotkeyManager) registerHotkey(binding, action string) {
 		return
 	}
 
+	logger.Info("Registering hotkey", "binding", binding, "action", action, "keys", keys)
+
 	// Register with gohook
 	gohook.Register(gohook.KeyDown, keys, func(e gohook.Event) {
+		logger.Info("Hotkey callback triggered", "action", action, "binding", binding)
 		h.triggerHandler(action)
 	})
 
-	logger.Info("Hotkey registered", "binding", binding, "action", action)
-}
-
-// handleEvent processes keyboard events
-func (h *HotkeyManager) handleEvent(evt gohook.Event) {
-	// Event handling is done via registered callbacks
+	logger.Info("Hotkey registered successfully", "binding", binding, "action", action, "parsed_keys", keys)
 }
 
 // triggerHandler triggers a registered handler
