@@ -53,7 +53,7 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 
 	// Setup system tray if available
 	if desk, ok := app.(desktop.App); ok {
-		ui.SetupSystemTray(desk, mainWindow)
+		ui.SetupSystemTray(desk, mainWindow, resourceIconPng)
 	}
 
 	// Setup window close intercept
