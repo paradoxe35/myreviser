@@ -49,16 +49,9 @@ type MainWindow struct {
 func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
 	window := app.NewWindow("MyReviser Settings")
 
-	// Set window size with constraints
-	window.Resize(fyne.NewSize(700, 500))
-	window.SetFixedSize(false)
-
-	// Set maximum size to prevent overflow
-	if desk, ok := window.(interface {
-		SetMaxSize(fyne.Size)
-	}); ok {
-		desk.SetMaxSize(fyne.NewSize(MaxWindowWidth, MaxWindowHeight))
-	}
+	// Set fixed window size
+	window.Resize(fyne.NewSize(650, 550))
+	window.SetFixedSize(true)
 
 	window.CenterOnScreen()
 
@@ -227,14 +220,15 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 
 	// Hotkey instructions
-	instructions := widget.NewCard("", "How to Capture Hotkeys",
-		widget.NewLabel("1. Click the 'Capture' button\n"+
-			"2. Press your desired key combination\n"+
-			"3. Release the keys to save\n"+
-			"4. Press ESC to cancel\n\n"+
-			"Note: You must use at least one modifier key\n"+
-			"(Ctrl, Alt, Shift, or Super/Win/Cmd).\n\n"+
-			"Some combinations may be reserved by your OS."))
+	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
+		"2. Press your desired key combination\n" +
+		"3. Release the keys to save\n" +
+		"4. Press ESC to cancel\n\n" +
+		"Note: You must use at least one modifier key\n" +
+		"(Ctrl, Alt, Shift, or Super/Win/Cmd).\n\n" +
+		"Some combinations may be reserved by your OS.")
+	instructionsLabel.Wrapping = fyne.TextWrapWord
+	instructions := widget.NewCard("", "How to Capture Hotkeys", instructionsLabel)
 
 	// Reset to defaults button
 	resetBtn := widget.NewButton("Reset to Defaults", func() {

@@ -8,6 +8,7 @@ require (
 	github.com/go-vgo/robotgo v0.110.8
 	github.com/robotn/gohook v0.42.2
 	golang.design/x/clipboard v0.7.1
+	golang.design/x/hotkey v0.4.1
 )
 
 require (
@@ -59,6 +60,7 @@ require (
 	github.com/vcaesar/tt v0.20.1 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	golang.design/x/mainthread v0.3.0 // indirect
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 	golang.org/x/exp/shiny v0.0.0-20250606033433-dcc06ee1d476 // indirect
 	golang.org/x/image v0.28.0 // indirect
