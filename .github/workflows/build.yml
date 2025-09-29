@@ -1,0 +1,564 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: "Enable debug mode"
+        type: boolean
+        required: false
+        default: false
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  build-linux:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1-mesa-dev \
+            xorg-dev \
+            libx11-dev \
+            libxkbfile-dev \
+            libxtst-dev \
+            libpng-dev \
+            libjpeg-dev \
+            libxinerama-dev \
+            libxcb-xkb-dev \
+            libxkbcommon-x11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxrender-dev \
+            libxfixes-dev \
+            libxxf86vm-dev \
+            libxkbcommon-dev
+
+      - name: Install Fyne
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Bundle resources
+        run: |
+          if [ -f assets/icon.png ]; then
+            fyne bundle -o bundled.go assets/icon.png
+          fi
+
+      - name: Build application
+        env:
+          CGO_ENABLED: 1
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-linux-${{ matrix.arch }}
+
+      - name: Package with Fyne
+        run: |
+          fyne package -os linux -icon assets/icon.png -name MyReviser -release
+
+      - name: Create portable archive
+        run: |
+          mkdir -p dist/portable
+          cp myreviser-linux-${{ matrix.arch }} dist/portable/myreviser
+          chmod +x dist/portable/myreviser
+          if [ -f assets/icon.png ]; then
+            cp assets/icon.png dist/portable/
+          fi
+          tar -czf myreviser-linux-${{ matrix.arch }}.tar.gz -C dist/portable .
+
+      - name: Create AppImage
+        if: matrix.arch == 'amd64'
+        run: |
+          # Download linuxdeploy
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+
+          # Create AppDir structure
+          mkdir -p AppDir/usr/bin
+          cp myreviser-linux-${{ matrix.arch }} AppDir/usr/bin/myreviser
+          chmod +x AppDir/usr/bin/myreviser
+
+          # Copy icon
+          if [ -f assets/icon.png ]; then
+            cp assets/icon.png AppDir/myreviser.png
+          fi
+
+          # Create desktop entry
+          cat > AppDir/myreviser.desktop <<EOF
+          [Desktop Entry]
+          Name=MyReviser
+          Comment=AI-powered text revision tool
+          Exec=myreviser
+          Icon=myreviser
+          Terminal=false
+          Type=Application
+          Categories=Utility;TextEditor;
+          StartupNotify=true
+          EOF
+
+          # Create AppImage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+          mv *.AppImage myreviser-linux-${{ matrix.arch }}.AppImage
+
+      - name: Create .deb package
+        run: |
+          mkdir -p dist/deb/DEBIAN
+          mkdir -p dist/deb/usr/local/bin
+          mkdir -p dist/deb/usr/share/applications
+          mkdir -p dist/deb/usr/share/icons/hicolor/256x256/apps
+
+          # Copy binary
+          cp myreviser-linux-${{ matrix.arch }} dist/deb/usr/local/bin/myreviser
+          chmod +x dist/deb/usr/local/bin/myreviser
+
+          # Create control file
+          cat > dist/deb/DEBIAN/control <<EOF
+          Package: myreviser
+          Version: ${GITHUB_REF_NAME#v}
+          Architecture: ${{ matrix.arch }}
+          Maintainer: Paradoxe Ng <contact@pngwasi.me>
+          Description: AI-powered text revision tool
+           MyReviser is a system tray application that provides global hotkeys
+           for instant text enhancement using AI providers.
+          Depends: libgl1-mesa-glx, libx11-6, libxcursor1, libxrandr2
+          EOF
+
+          # Create desktop entry
+          cat > dist/deb/usr/share/applications/myreviser.desktop <<EOF
+          [Desktop Entry]
+          Name=MyReviser
+          Comment=AI-powered text revision tool
+          Exec=/usr/local/bin/myreviser
+          Icon=myreviser
+          Terminal=false
+          Type=Application
+          Categories=Utility;TextEditor;
+          StartupNotify=true
+          EOF
+
+          # Copy icon if exists
+          if [ -f assets/icon.png ]; then
+            cp assets/icon.png dist/deb/usr/share/icons/hicolor/256x256/apps/myreviser.png
+          fi
+
+          # Build deb package
+          dpkg-deb --build dist/deb myreviser-linux-${{ matrix.arch }}.deb
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-linux-${{ matrix.arch }}-portable
+          path: myreviser-linux-${{ matrix.arch }}.tar.gz
+
+      - name: Upload AppImage artifact
+        if: matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-linux-${{ matrix.arch }}-appimage
+          path: myreviser-linux-${{ matrix.arch }}.AppImage
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-linux-${{ matrix.arch }}-deb
+          path: myreviser-linux-${{ matrix.arch }}.deb
+
+  build-windows:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install MinGW
+        run: |
+          choco install mingw -y
+
+      - name: Install Fyne
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Bundle resources
+        run: |
+          if (Test-Path "assets/icon.png") {
+            fyne bundle -o bundled.go assets/icon.png
+          }
+
+      - name: Build application
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $buildTime = Get-Date -Format "yyyy-MM-dd_HH:mm:ss"
+          go build -ldflags "-s -w -H=windowsgui -X main.Version=$version -X main.BuildTime=$buildTime" -o myreviser-windows-${{ matrix.arch }}.exe
+
+      - name: Package with Fyne
+        run: |
+          if (Test-Path "assets/icon.ico") {
+            fyne package -os windows -icon assets/icon.ico -name MyReviser -release
+          } else {
+            fyne package -os windows -icon assets/icon.png -name MyReviser -release
+          }
+
+      - name: Create portable ZIP
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\portable
+          Copy-Item myreviser-windows-${{ matrix.arch }}.exe dist\portable\myreviser.exe
+          if (Test-Path "assets/icon.ico") {
+            Copy-Item assets\icon.ico dist\portable\
+          }
+          Compress-Archive -Path dist\portable\* -DestinationPath myreviser-windows-${{ matrix.arch }}-portable.zip
+
+      - name: Create installer (NSIS)
+        if: matrix.arch == 'amd64'
+        run: |
+          # Install NSIS
+          choco install nsis -y
+          $env:Path += ";C:\Program Files (x86)\NSIS"
+
+          # Create NSIS script
+          @"
+          !define PRODUCT_NAME "MyReviser"
+          !define PRODUCT_VERSION "${{ github.ref_name }}"
+          !define PRODUCT_PUBLISHER "Paradoxe Ng"
+          !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser-go"
+
+          Name "`${PRODUCT_NAME}"
+          OutFile "myreviser-windows-${{ matrix.arch }}-installer.exe"
+          InstallDir "`$PROGRAMFILES64\`${PRODUCT_NAME}"
+          RequestExecutionLevel admin
+
+          Section "MainSection" SEC01
+            SetOutPath "`$INSTDIR"
+            File "myreviser-windows-${{ matrix.arch }}.exe"
+            File /oname=myreviser.exe "myreviser-windows-${{ matrix.arch }}.exe"
+
+            ; Create shortcuts
+            CreateDirectory "`$SMPROGRAMS\`${PRODUCT_NAME}"
+            CreateShortcut "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
+            CreateShortcut "`$DESKTOP\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
+
+            ; Add to startup (optional)
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "`${PRODUCT_NAME}" "`$INSTDIR\myreviser.exe"
+
+            ; Write uninstaller
+            WriteUninstaller "`$INSTDIR\Uninstall.exe"
+
+            ; Write registry keys
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "DisplayName" "`${PRODUCT_NAME}"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "UninstallString" "`$INSTDIR\Uninstall.exe"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "DisplayVersion" "`${PRODUCT_VERSION}"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "Publisher" "`${PRODUCT_PUBLISHER}"
+          SectionEnd
+
+          Section "Uninstall"
+            Delete "`$INSTDIR\myreviser.exe"
+            Delete "`$INSTDIR\Uninstall.exe"
+            Delete "`$DESKTOP\`${PRODUCT_NAME}.lnk"
+            Delete "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk"
+            RMDir "`$SMPROGRAMS\`${PRODUCT_NAME}"
+            RMDir "`$INSTDIR"
+
+            ; Remove from startup
+            DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "`${PRODUCT_NAME}"
+
+            ; Remove registry keys
+            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}"
+          SectionEnd
+          "@ | Out-File -Encoding UTF8 installer.nsi
+
+          # Build installer
+          makensis installer.nsi
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-windows-${{ matrix.arch }}-portable
+          path: myreviser-windows-${{ matrix.arch }}-portable.zip
+
+      - name: Upload installer artifact
+        if: matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-windows-${{ matrix.arch }}-installer
+          path: myreviser-windows-${{ matrix.arch }}-installer.exe
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-windows-${{ matrix.arch }}-exe
+          path: myreviser-windows-${{ matrix.arch }}.exe
+
+  build-macos:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install Fyne
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Bundle resources
+        run: |
+          if [ -f assets/icon.png ]; then
+            fyne bundle -o bundled.go assets/icon.png
+          fi
+
+      - name: Build application
+        env:
+          CGO_ENABLED: 1
+          GOOS: darwin
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-darwin-${{ matrix.arch }}
+
+      - name: Package with Fyne
+        run: |
+          fyne package -os darwin -icon assets/icon.png -name MyReviser -release
+
+      - name: Create .app bundle manually if needed
+        run: |
+          if [ ! -d "MyReviser.app" ]; then
+            mkdir -p MyReviser.app/Contents/MacOS
+            mkdir -p MyReviser.app/Contents/Resources
+
+            # Copy binary
+            cp myreviser-darwin-${{ matrix.arch }} MyReviser.app/Contents/MacOS/myreviser
+            chmod +x MyReviser.app/Contents/MacOS/myreviser
+
+            # Create Info.plist
+            cat > MyReviser.app/Contents/Info.plist <<EOF
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+              <key>CFBundleExecutable</key>
+              <string>myreviser</string>
+              <key>CFBundleIdentifier</key>
+              <string>me.pngwasi.myreviser</string>
+              <key>CFBundleName</key>
+              <string>MyReviser</string>
+              <key>CFBundleDisplayName</key>
+              <string>MyReviser</string>
+              <key>CFBundleVersion</key>
+              <string>${GITHUB_REF_NAME#v}</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${GITHUB_REF_NAME#v}</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.13</string>
+              <key>LSUIElement</key>
+              <true/>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>NSAppleEventsUsageDescription</key>
+              <string>MyReviser needs automation access for text revision</string>
+              <key>NSAccessibilityUsageDescription</key>
+              <string>MyReviser needs accessibility access for global hotkeys</string>
+            </dict>
+            </plist>
+            EOF
+
+            # Copy icon if exists
+            if [ -f assets/icon.png ]; then
+              cp assets/icon.png MyReviser.app/Contents/Resources/
+            fi
+            if [ -f assets/icon.icns ]; then
+              cp assets/icon.icns MyReviser.app/Contents/Resources/icon.icns
+            fi
+          fi
+
+      - name: Sign app bundle (if certificates available)
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          # Import certificate
+          # codesign --deep --force --verify --verbose --sign "Developer ID Application" MyReviser.app
+
+      - name: Create ZIP archive
+        run: |
+          zip -r myreviser-darwin-${{ matrix.arch }}.zip MyReviser.app
+
+      - name: Create DMG
+        run: |
+          # Install create-dmg
+          brew install create-dmg || true
+
+          # Create DMG
+          create-dmg \
+            --volname "MyReviser" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "MyReviser.app" 175 120 \
+            --hide-extension "MyReviser.app" \
+            --app-drop-link 425 120 \
+            --no-internet-enable \
+            "myreviser-darwin-${{ matrix.arch }}.dmg" \
+            "MyReviser.app" || true
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-darwin-${{ matrix.arch }}-zip
+          path: myreviser-darwin-${{ matrix.arch }}.zip
+
+      - name: Upload DMG artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myreviser-darwin-${{ matrix.arch }}-dmg
+          path: myreviser-darwin-${{ matrix.arch }}.dmg
+          if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+
+          # Move all artifacts to release folder
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" -o -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" \) -exec cp {} release/ \;
+
+          # Create checksums
+          cd release
+          sha256sum * > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          body: |
+            ## MyReviser ${{ github.ref_name }}
+
+            ### 📦 Downloads
+
+            #### Windows
+            - **Portable (x64)**: `myreviser-windows-amd64-portable.zip` - Extract and run
+            - **Installer (x64)**: `myreviser-windows-amd64-installer.exe` - Traditional installer
+            - **ARM64**: `myreviser-windows-arm64-portable.zip` - For ARM-based Windows devices
+
+            #### macOS
+            - **Intel**: `myreviser-darwin-amd64.zip` / `myreviser-darwin-amd64.dmg`
+            - **Apple Silicon**: `myreviser-darwin-arm64.zip` / `myreviser-darwin-arm64.dmg`
+
+            #### Linux
+            - **Portable (x64)**: `myreviser-linux-amd64.tar.gz` - Extract and run
+            - **AppImage (x64)**: `myreviser-linux-amd64.AppImage` - Universal Linux package
+            - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `dpkg -i`
+            - **ARM64**: `myreviser-linux-arm64.tar.gz` / `myreviser-linux-arm64.deb`
+
+            ### 🔐 Verify Downloads
+            Check `checksums.txt` for SHA256 hashes of all files.
+
+            ### 📋 System Requirements
+
+            **All Platforms**:
+            - Go 1.21+ runtime dependencies
+            - System tray support
+
+            **Linux**:
+            - X11 or Wayland
+            - OpenGL support (libgl1-mesa-glx)
+            - GTK3 (optional for better theme integration)
+
+            **macOS**:
+            - macOS 10.13+
+            - Grant accessibility permissions for global hotkeys
+
+            **Windows**:
+            - Windows 10 or later
+            - Visual C++ Redistributable (usually pre-installed)
+
+            ### 🚀 Quick Start
+
+            1. Download the appropriate file for your system
+            2. Extract (for portable versions) or install
+            3. Launch MyReviser - it will appear in your system tray
+            4. Click the tray icon → Settings to configure your AI provider
+            5. Set up your preferred hotkeys
+            6. Use global hotkeys to revise text instantly!
+
+            ### ⌨️ Default Hotkeys
+            - **Select All & Revise**: `Ctrl+Alt+Space` (Linux/Windows), `Cmd+Option+Space` (macOS)
+            - **Revise Selection**: `Ctrl+Super` (Linux), `Ctrl+Win` (Windows), `Ctrl+Cmd` (macOS)
+
+            ### 🎯 Features
+            - AI-powered text revision with multiple providers (OpenAI, Claude, Gemini)
+            - Global hotkeys for instant text enhancement
+            - System tray integration
+            - Cross-platform support
+            - Lightweight and fast (native Go with Fyne UI)
+
+            ### 📝 Changes
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+
+            ### 🐛 Known Issues
+            - Linux: Requires X11 libraries for global hotkeys
+            - macOS: First launch requires accessibility permissions
+            - Windows: May require running as administrator for some applications
+
+            ### 📚 Documentation
+            Visit our [GitHub repository](https://github.com/paradoxe35/myreviser-go) for full documentation.
+          draft: false
+          prerelease: false
+          generate_release_notes: true

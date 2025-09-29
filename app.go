@@ -1,0 +1,116 @@
+package main
+
+import (
+	"fmt"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver/desktop"
+	"github.com/paradoxe35/myreviser-go/internal/config"
+	"github.com/paradoxe35/myreviser-go/internal/input"
+	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser-go/internal/revision"
+	"github.com/paradoxe35/myreviser-go/ui"
+)
+
+// Application represents the main application
+type Application struct {
+	app             fyne.App
+	mainWindow      *ui.MainWindow
+	config          *config.Config
+	hotkeyManager   *input.HotkeyManager
+	processor       *revision.Processor
+}
+
+// NewApplication creates a new application instance
+func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
+	// Create revision processor
+	processor, err := revision.NewProcessor(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create processor: %w", err)
+	}
+
+	// Create hotkey manager
+	hotkeyManager := input.NewHotkeyManager()
+
+	// Create main window
+	mainWindow := ui.NewMainWindow(app, cfg)
+
+	application := &Application{
+		app:           app,
+		mainWindow:    mainWindow,
+		config:        cfg,
+		hotkeyManager: hotkeyManager,
+		processor:     processor,
+	}
+
+	// Setup hotkeys
+	application.setupHotkeys()
+
+	// Setup system tray if available
+	if desk, ok := app.(desktop.App); ok {
+		ui.SetupSystemTray(desk, mainWindow)
+	}
+
+	// Setup window close intercept
+	mainWindow.SetCloseIntercept(func() {
+		mainWindow.Hide()
+	})
+
+	return application, nil
+}
+
+// setupHotkeys configures the hotkey handlers
+func (a *Application) setupHotkeys() {
+	// Set bindings from config
+	a.hotkeyManager.SetBindings(
+		a.config.Hotkeys.SelectAll,
+		a.config.Hotkeys.Selection,
+	)
+
+	// Register handlers
+	a.hotkeyManager.RegisterHandler("select_all", func() {
+		logger.Info("Select all hotkey triggered")
+		if err := a.processor.ProcessSelectAll(); err != nil {
+			logger.Error("Failed to process select all", "error", err)
+			// TODO: Show notification to user
+		}
+	})
+
+	a.hotkeyManager.RegisterHandler("selection", func() {
+		logger.Info("Selection hotkey triggered")
+		if err := a.processor.ProcessSelection(); err != nil {
+			logger.Error("Failed to process selection", "error", err)
+			// TODO: Show notification to user
+		}
+	})
+}
+
+// Start starts the application
+func (a *Application) Start() error {
+	// Start hotkey manager
+	if err := a.hotkeyManager.Start(); err != nil {
+		return fmt.Errorf("failed to start hotkey manager: %w", err)
+	}
+
+	logger.Info("Application started successfully")
+
+	// Show window if not set to start minimized
+	if !a.config.Appearance.StartMinimized {
+		a.mainWindow.Show()
+	}
+
+	// Run the application
+	a.app.Run()
+	return nil
+}
+
+// Stop stops the application
+func (a *Application) Stop() {
+	logger.Info("Stopping application")
+
+	// Stop hotkey manager
+	a.hotkeyManager.Stop()
+
+	// Quit the app
+	a.app.Quit()
+}
