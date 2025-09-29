@@ -188,16 +188,10 @@ func parseHotkeyBinding(binding string) ([]hotkey.Modifier, hotkey.Key, error) {
 		part = strings.TrimSpace(part)
 
 		// Check if it's a modifier
-		switch part {
-		case "ctrl", "control":
-			modifiers = append(modifiers, hotkey.ModCtrl)
-		case "alt":
-			modifiers = append(modifiers, hotkey.Mod1) // Alt on Linux
-		case "shift":
-			modifiers = append(modifiers, hotkey.ModShift)
-		case "cmd", "command", "super", "win", "windows":
-			modifiers = append(modifiers, hotkey.Mod4) // Super/Windows key on Linux
-		default:
+		mod, isModifier := parseModifier(part)
+		if isModifier {
+			modifiers = append(modifiers, mod)
+		} else {
 			// It's a key
 			if keyFound {
 				return nil, 0, fmt.Errorf("multiple keys specified: %s", binding)
