@@ -1,3 +1,7 @@
+// MyReviser - AI-powered text revision tool
+// Author: Paradoxe Ng <contact@pngwasi.me>
+// Repository: https://github.com/paradoxe35/myreviser-go
+
 package main
 
 import (
@@ -5,8 +9,8 @@ import (
 	"os"
 
 	"fyne.io/fyne/v2/app"
+	singleinstance "github.com/allan-simon/go-singleinstance"
 	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/instance"
 	"github.com/paradoxe35/myreviser-go/internal/logger"
 	"github.com/paradoxe35/myreviser-go/ui"
 )
@@ -23,12 +27,12 @@ func main() {
 	}
 
 	// Check for single instance
-	instanceMgr, err := instance.NewManager()
+	lockFile, err := singleinstance.CreateLockFile("myreviser.lock")
 	if err != nil {
 		logger.Error("Another instance is already running", "error", err)
 		os.Exit(1)
 	}
-	defer instanceMgr.Close()
+	defer lockFile.Close()
 
 	// Load configuration
 	cfg, err := config.Load()

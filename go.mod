@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	fyne.io/fyne/v2 v2.6.3
+	github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
 	github.com/go-vgo/robotgo v0.110.8
 	github.com/robotn/gohook v0.42.2
 	golang.design/x/clipboard v0.7.1
