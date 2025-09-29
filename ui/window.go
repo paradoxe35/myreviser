@@ -148,6 +148,8 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 }
 
 func (w *MainWindow) createProviderSection() fyne.CanvasObject {
+	selected, _ := w.providerBinding.Get()
+
 	// Provider selection
 	providerLabel := widget.NewLabel("AI Provider:")
 	providerSelect := widget.NewSelect(
@@ -157,15 +159,15 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 			w.updateProviderDefaults(value)
 
 			// Show/hide Base URL based on provider
-			if value == "openai" {
-				w.baseURLContainer.Show()
-			} else {
-				w.baseURLContainer.Hide()
+			if w.baseURLContainer != nil {
+				if value == "openai" {
+					w.baseURLContainer.Show()
+				} else {
+					w.baseURLContainer.Hide()
+				}
 			}
 		},
 	)
-	selected, _ := w.providerBinding.Get()
-	providerSelect.SetSelected(selected)
 
 	// API Key
 	apiKeyLabel := widget.NewLabel("API Key:")
@@ -191,11 +193,6 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		container.NewBorder(nil, nil, baseURLLabel, nil, w.baseURLEntry),
 	)
 
-	// Show/hide Base URL based on initial provider
-	if selected != "openai" {
-		w.baseURLContainer.Hide()
-	}
-
 	// Test connection button
 	testBtn := widget.NewButtonWithIcon("Test Connection", theme.ConfirmIcon(), func() {
 		w.testAPIConnection()
@@ -215,6 +212,14 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		layout.NewSpacer(),
 		testBtn,
 	)
+
+	// Now set the initial provider selection (after container is created)
+	providerSelect.SetSelected(selected)
+
+	// Set initial visibility based on provider
+	if selected != "openai" {
+		w.baseURLContainer.Hide()
+	}
 
 	return container.NewScroll(form)
 }
