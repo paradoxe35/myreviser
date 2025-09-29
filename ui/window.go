@@ -215,25 +215,17 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		w.testAPIConnection()
 	})
 
-	// Add spacing between sections
-	spacer := func() fyne.CanvasObject {
-		return container.NewPadded(widget.NewLabel(""))
-	}
+	// Small spacer for top spacing only
+	topSpacer := container.NewPadded(widget.NewLabel(""))
 
 	form := container.NewVBox(
-		spacer(), // Top spacing
+		topSpacer, // Top spacing from tab header
 		container.NewPadded(container.NewBorder(nil, nil, providerLabel, nil, providerSelect)),
-		spacer(),
 		widget.NewSeparator(),
-		spacer(),
 		container.NewPadded(container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry)),
-		spacer(),
 		container.NewPadded(container.NewBorder(nil, nil, modelLabel, nil, modelEntry)),
-		spacer(),
 		w.baseURLContainer,
-		spacer(),
 		widget.NewSeparator(),
-		spacer(),
 		container.NewPadded(testBtn),
 	)
 
