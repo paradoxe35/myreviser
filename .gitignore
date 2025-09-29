@@ -33,6 +33,7 @@ myreviser.exe
 
 # Fyne bundled resources
 bundled.go
+fyne_metadata_init.go
 
 # IDE and editor files
 .vscode/
