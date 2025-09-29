@@ -36,8 +36,8 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Create notification manager
 	notifications := ui.NewNotificationManager(app)
 
-	// Create main window
-	mainWindow := ui.NewMainWindow(app, cfg)
+	// Create main window with hotkey manager reference
+	mainWindow := ui.NewMainWindow(app, cfg, hotkeyManager)
 
 	application := &Application{
 		app:           app,

@@ -163,6 +163,11 @@ func (h *HotkeyManager) registerHotkey(binding, action string) {
 // triggerHandler triggers a registered handler
 func (h *HotkeyManager) triggerHandler(action string) {
 	h.mu.RLock()
+	if h.disabled {
+		h.mu.RUnlock()
+		logger.Debug("Hotkey ignored (disabled)", "action", action)
+		return
+	}
 	handler, exists := h.handlers[action]
 	h.mu.RUnlock()
 
@@ -348,4 +353,20 @@ func (h *HotkeyManager) IsActive() bool {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.active
+}
+
+// Disable temporarily disables hotkey handling (e.g., during hotkey capture)
+func (h *HotkeyManager) Disable() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.disabled = true
+	logger.Info("Hotkeys temporarily disabled")
+}
+
+// Enable re-enables hotkey handling
+func (h *HotkeyManager) Enable() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.disabled = false
+	logger.Info("Hotkeys re-enabled")
 }

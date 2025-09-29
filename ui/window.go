@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/paradoxe35/myreviser-go/internal/ai"
 	"github.com/paradoxe35/myreviser-go/internal/config"
+	"github.com/paradoxe35/myreviser-go/internal/input"
 	"github.com/paradoxe35/myreviser-go/internal/logger"
 )
 
@@ -27,8 +28,9 @@ const (
 
 type MainWindow struct {
 	fyne.Window
-	app    fyne.App
-	config *config.Config
+	app           fyne.App
+	config        *config.Config
+	hotkeyManager *input.HotkeyManager
 
 	// Data bindings
 	providerBinding        binding.String
@@ -46,7 +48,7 @@ type MainWindow struct {
 	baseURLEntry     *widget.Entry
 }
 
-func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
+func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.HotkeyManager) *MainWindow {
 	window := app.NewWindow("MyReviser Settings")
 
 	// Set fixed window size
@@ -56,9 +58,10 @@ func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
 	window.CenterOnScreen()
 
 	mw := &MainWindow{
-		Window: window,
-		app:    app,
-		config: cfg,
+		Window:        window,
+		app:           app,
+		config:        cfg,
+		hotkeyManager: hotkeyManager,
 	}
 
 	// Initialize data bindings
@@ -234,11 +237,33 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectAllLabel := widget.NewLabel("Select All & Revise:")
 	selectAllCapture := NewHotkeyCapture(w.hotkeySelectBinding, "Click 'Capture' to set hotkey")
 	selectAllCapture.window = w.Window // Set window reference for focus
+	// Connect callbacks to disable/enable global hotkeys during capture
+	selectAllCapture.onCaptureStart = func() {
+		if w.hotkeyManager != nil {
+			w.hotkeyManager.Disable()
+		}
+	}
+	selectAllCapture.onCaptureStop = func() {
+		if w.hotkeyManager != nil {
+			w.hotkeyManager.Enable()
+		}
+	}
 
 	// Selection Hotkey with capture widget
 	selectionLabel := widget.NewLabel("Revise Selection:")
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 	selectionCapture.window = w.Window // Set window reference for focus
+	// Connect callbacks to disable/enable global hotkeys during capture
+	selectionCapture.onCaptureStart = func() {
+		if w.hotkeyManager != nil {
+			w.hotkeyManager.Disable()
+		}
+	}
+	selectionCapture.onCaptureStop = func() {
+		if w.hotkeyManager != nil {
+			w.hotkeyManager.Enable()
+		}
+	}
 
 	// Hotkey instructions
 	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
