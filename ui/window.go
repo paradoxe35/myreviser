@@ -295,6 +295,10 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 		}
 	}
 
+	// Link capture widgets as siblings so only one can capture at a time
+	selectAllCapture.SetSiblings(selectionCapture)
+	selectionCapture.SetSiblings(selectAllCapture)
+
 	// Hotkey instructions
 	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
 		"2. Press your desired key combination\n" +

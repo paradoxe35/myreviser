@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image/color"
 	"runtime"
 	"strings"
 	"sync"
@@ -21,10 +22,12 @@ type HotkeyCapture struct {
 	stopBtn        *widget.Button
 	clearBtn       *widget.Button
 	container      *fyne.Container
-	entry          *captureEntry // Entry to capture and display keyboard events
-	window         fyne.Window   // Reference to parent window for focus
-	onCaptureStart func()        // Callback when capture starts
-	onCaptureStop  func()        // Callback when capture stops
+	displayLabel   *widget.Label  // Label to display saved keybinding
+	entry          *captureEntry  // Entry to capture keyboard events
+	window         fyne.Window    // Reference to parent window for focus
+	onCaptureStart func()         // Callback when capture starts
+	onCaptureStop  func()         // Callback when capture stops
+	siblings       []*HotkeyCapture // Other capture widgets to disable during capture
 
 	isCapturing bool
 	mu          sync.Mutex
@@ -33,7 +36,7 @@ type HotkeyCapture struct {
 	modifiers   map[fyne.KeyModifier]bool
 }
 
-// captureEntry is a hidden entry widget that captures keyboard events
+// captureEntry is a custom entry widget that captures keyboard events with white background
 type captureEntry struct {
 	widget.Entry
 	parent *HotkeyCapture
@@ -45,6 +48,30 @@ func (e *captureEntry) TypedKey(key *fyne.KeyEvent) {
 	}
 }
 
+func (e *captureEntry) CreateRenderer() fyne.WidgetRenderer {
+	e.ExtendBaseWidget(e)
+	renderer := e.Entry.CreateRenderer()
+
+	// Use themed background for better visibility
+	return &themedBackgroundRenderer{
+		WidgetRenderer: renderer,
+		entry:          e,
+	}
+}
+
+type themedBackgroundRenderer struct {
+	fyne.WidgetRenderer
+	entry *captureEntry
+}
+
+func (r *themedBackgroundRenderer) BackgroundColor() color.Color {
+	// Use theme-appropriate background color for input fields
+	if r.entry.Disabled() {
+		return theme.Color(theme.ColorNameDisabledButton)
+	}
+	return theme.Color(theme.ColorNameInputBackground)
+}
+
 // NewHotkeyCapture creates a new hotkey capture widget
 func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture {
 	h := &HotkeyCapture{
@@ -53,18 +80,23 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 		modifiers:   make(map[fyne.KeyModifier]bool),
 	}
 
-	// Create entry for keyboard capture and display
-	h.entry = &captureEntry{parent: h}
-	h.entry.PlaceHolder = placeholder
-	h.entry.Disable()
-	h.entry.TextStyle.Bold = true      // Make text bold for better visibility
-	h.entry.TextStyle.Monospace = true // Use monospace font for key combinations
+	// Create label to display saved keybinding
+	h.displayLabel = widget.NewLabel(placeholder)
+	h.displayLabel.TextStyle.Bold = true
+	h.displayLabel.TextStyle.Monospace = true
 
-	// Update entry when binding changes
+	// Update label when binding changes
 	currentValue, _ := binding.Get()
 	if currentValue != "" {
-		h.entry.SetText(currentValue)
+		h.displayLabel.SetText(currentValue)
 	}
+
+	// Create entry for keyboard capture (hidden by default)
+	h.entry = &captureEntry{parent: h}
+	h.entry.PlaceHolder = "Press keys... (ESC to cancel, Enter to save)"
+	h.entry.TextStyle.Bold = true
+	h.entry.TextStyle.Monospace = true
+	h.entry.Hide() // Hidden until capture starts
 
 	// Create capture button
 	h.captureBtn = widget.NewButtonWithIcon("Capture", theme.MediaRecordIcon(), func() {
@@ -78,21 +110,25 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 	h.stopBtn.Importance = widget.HighImportance
 	h.stopBtn.Hide()
 
-	// Create clear button
+	// Create clear button (hidden by default, will be removed from layout)
 	h.clearBtn = widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 		h.clearHotkey()
 	})
 	h.clearBtn.Importance = widget.LowImportance
+	h.clearBtn.Hide() // Hide clear button entirely
 
-	// Create button container
-	buttonContainer := container.NewHBox(h.clearBtn, h.captureBtn, h.stopBtn)
+	// Create button container (without clear button)
+	buttonContainer := container.NewHBox(h.captureBtn, h.stopBtn)
+
+	// Create a stack with label on bottom and entry on top (only one visible at a time)
+	displayStack := container.NewStack(h.displayLabel, h.entry)
 
 	// Create container
 	h.container = container.NewBorder(
 		nil, nil,
 		nil,
 		buttonContainer,
-		h.entry,
+		displayStack,
 	)
 
 	h.ExtendBaseWidget(h)
@@ -114,6 +150,11 @@ func (h *HotkeyCapture) startCapture() {
 	h.isCapturing = true
 	h.mu.Unlock()
 
+	// Disable sibling capture buttons
+	for _, sibling := range h.siblings {
+		sibling.captureBtn.Disable()
+	}
+
 	// Notify that capture is starting (disable global hotkeys)
 	if h.onCaptureStart != nil {
 		h.onCaptureStart()
@@ -123,15 +164,12 @@ func (h *HotkeyCapture) startCapture() {
 	h.pressedKeys = make(map[fyne.KeyName]bool)
 	h.modifiers = make(map[fyne.KeyModifier]bool)
 
-	// Update UI
+	// Update UI - hide label, show entry
+	h.displayLabel.Hide()
 	h.entry.SetText("")
-	h.entry.SetPlaceHolder("Press keys... (ESC to cancel, Enter to save)")
+	h.entry.Show()
 	h.captureBtn.Hide()
 	h.stopBtn.Show()
-	h.clearBtn.Hide() // Hide clear button during capture
-
-	// Enable and focus the entry to capture keys
-	h.entry.Enable()
 
 	// Focus the entry widget so it receives keyboard events
 	if h.window != nil {
@@ -150,25 +188,29 @@ func (h *HotkeyCapture) stopCapture() {
 	h.isCapturing = false
 	h.mu.Unlock()
 
+	// Re-enable sibling capture buttons
+	for _, sibling := range h.siblings {
+		sibling.captureBtn.Enable()
+	}
+
 	// Notify that capture is stopping (re-enable global hotkeys)
 	if h.onCaptureStop != nil {
 		h.onCaptureStop()
 	}
 
-	// Update UI
-	h.entry.Disable()
+	// Update UI - hide entry, show label
+	h.entry.Hide()
 	h.stopBtn.Hide()
 	h.captureBtn.Show()
-	h.clearBtn.Show() // Show clear button again
 
-	// Restore previous value or show placeholder
+	// Restore previous value in label or show placeholder
 	currentValue, _ := h.binding.Get()
 	if currentValue != "" {
-		h.entry.SetText(currentValue)
+		h.displayLabel.SetText(currentValue)
 	} else {
-		h.entry.SetText("")
-		h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
+		h.displayLabel.SetText("Click 'Capture' to set hotkey")
 	}
+	h.displayLabel.Show()
 }
 
 // handleKeyPress processes key press events from Fyne
@@ -185,12 +227,6 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 		h.mu.Unlock()
 		h.stopCapture()
 		h.mu.Lock()
-		currentValue, _ := h.binding.Get()
-		if currentValue != "" {
-			h.entry.SetText(currentValue)
-		} else {
-			h.entry.SetText("")
-		}
 		return
 	}
 
@@ -282,7 +318,7 @@ func (h *HotkeyCapture) saveHotkey() {
 
 	// Must have at least one modifier and one regular key
 	if len(h.modifiers) == 0 || len(h.pressedKeys) == 0 {
-		h.entry.SetText("Invalid combination (need modifier + key)")
+		h.displayLabel.SetText("Invalid combination (need modifier + key)")
 		return
 	}
 
@@ -290,14 +326,13 @@ func (h *HotkeyCapture) saveHotkey() {
 
 	// Save to binding
 	h.binding.Set(hotkeyStr)
-	h.entry.SetText(hotkeyStr)
+	h.displayLabel.SetText(hotkeyStr)
 }
 
 // clearHotkey clears the current hotkey
 func (h *HotkeyCapture) clearHotkey() {
 	h.binding.Set("")
-	h.entry.SetText("")
-	h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
+	h.displayLabel.SetText("Click 'Capture' to set hotkey")
 }
 
 // StopCapture stops capture if currently capturing (public method for external use)
@@ -315,11 +350,15 @@ func (h *HotkeyCapture) StopCapture() {
 func (h *HotkeyCapture) UpdateFromBinding() {
 	currentValue, _ := h.binding.Get()
 	if currentValue != "" {
-		h.entry.SetText(currentValue)
+		h.displayLabel.SetText(currentValue)
 	} else {
-		h.entry.SetText("")
-		h.entry.SetPlaceHolder("Click 'Capture' to set hotkey")
+		h.displayLabel.SetText("Click 'Capture' to set hotkey")
 	}
+}
+
+// SetSiblings sets other capture widgets that should be disabled during capture
+func (h *HotkeyCapture) SetSiblings(siblings ...*HotkeyCapture) {
+	h.siblings = siblings
 }
 
 // Helper functions
