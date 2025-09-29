@@ -19,7 +19,7 @@ MyReviser is a cross-platform text revision tool built in **Go with Fyne** that 
 - **Language**: Go 1.24+
 - **GUI Framework**: Fyne (v2.6.3+) - Cross-platform Go UI framework
 - **System Tray**: Native Fyne systray support via `desktop.App` interface
-- **Global Hotkeys**: `github.com/robotn/gohook` for cross-platform keyboard/mouse events
+- **Global Hotkeys**: `golang.design/x/hotkey` for cross-platform system-wide keyboard events
 - **Clipboard**:
   - Fyne native: `fyne.Clipboard` interface (text-only)
   - Extended: `github.com/golang-design/clipboard` (supports read/write with images)
@@ -70,8 +70,9 @@ go 1.24.0
 
 require (
     fyne.io/fyne/v2 v2.6.3
-    github.com/robotn/gohook v0.41.0
-    golang.design/x/clipboard v0.7.0  // Extended clipboard support
+    golang.design/x/hotkey v0.4.1      // System-wide global hotkeys
+    golang.design/x/mainthread v0.3.0  // Required by hotkey for main thread execution
+    golang.design/x/clipboard v0.7.0   // Extended clipboard support
     github.com/atotto/clipboard v0.1.4
     github.com/go-vgo/robotgo v0.110.0
     github.com/BurntSushi/toml v1.3.2
@@ -136,7 +137,7 @@ myreviser-go/
 │   │   ├── processor.go       # Text processing logic
 │   │   └── queue.go           # Single revision queue manager
 │   ├── input/
-│   │   ├── hotkeys.go         # Global hotkey registration using gohook
+│   │   ├── hotkeys.go         # Global hotkey registration using golang.design/x/hotkey
 │   │   ├── clipboard.go       # Clipboard operations (Fyne + extended)
 │   │   └── simulator.go       # Key simulation using robotgo
 │   ├── instance/
@@ -216,14 +217,16 @@ type ProviderFactory struct {
 type HotkeyManager struct {
     selectAllBinding string // e.g., "ctrl+alt+space"
     selectionBinding string // e.g., "ctrl+cmd" for macOS
-    hook            chan gohook.Event
+    hotkeys         map[string]*hotkey.Hotkey
     active          bool
     handlers        map[string]func()
 }
 
 func (h *HotkeyManager) Start() {
-    h.hook = gohook.Start()
-    go h.processEvents()
+    // Initialize on main thread (required by golang.design/x/hotkey)
+    mainthread.Init(func() {
+        h.registerHotkeys()
+    })
 }
 ```
 
@@ -757,20 +760,22 @@ func (c *ClipboardManager) SaveAndRestore(operation func()) {
 }
 ```
 
-### Hotkey Implementation with gohook
+### Hotkey Implementation with golang.design/x/hotkey
 ```go
 // internal/input/hotkeys.go
 package input
 
 import (
-    "github.com/robotn/gohook"
+    "golang.design/x/hotkey"
+    "golang.design/x/hotkey/mainthread"
     "github.com/golang-design/clipboard"
     "github.com/go-vgo/robotgo"
 )
 
 type HotkeyManager struct {
     handlers map[string]func()
-    hook     chan gohook.Event
+    hotkeys  map[string]*hotkey.Hotkey
+    stopChan chan struct{}
 }
 
 func NewHotkeyManager() *HotkeyManager {
@@ -779,20 +784,54 @@ func NewHotkeyManager() *HotkeyManager {
 
     return &HotkeyManager{
         handlers: make(map[string]func()),
+        hotkeys:  make(map[string]*hotkey.Hotkey),
+        stopChan: make(chan struct{}),
     }
 }
 
-func (h *HotkeyManager) RegisterHotkey(keys []string, handler func()) {
-    gohook.Register(gohook.KeyDown, keys, func(e gohook.Event) {
-        handler()
-    })
+func (h *HotkeyManager) RegisterHotkey(binding string, action string, handler func()) error {
+    // Parse hotkey binding (e.g., "ctrl+alt+space")
+    modifiers, key, err := parseHotkeyBinding(binding)
+    if err != nil {
+        return err
+    }
+
+    // Create hotkey
+    hk := hotkey.New(modifiers, key)
+
+    // Register system-wide hotkey
+    if err := hk.Register(); err != nil {
+        return err
+    }
+
+    h.hotkeys[action] = hk
+    h.handlers[action] = handler
+
+    return nil
 }
 
 func (h *HotkeyManager) Start() {
-    h.hook = gohook.Start()
-    defer gohook.End()
+    // Must run on main thread
+    mainthread.Init(func() {
+        h.listenForHotkeys()
+    })
+}
 
-    <-gohook.Process(h.hook)
+func (h *HotkeyManager) listenForHotkeys() {
+    for action, hk := range h.hotkeys {
+        go func(action string, hk *hotkey.Hotkey) {
+            for {
+                select {
+                case <-h.stopChan:
+                    return
+                case <-hk.Keydown():
+                    if handler, ok := h.handlers[action]; ok {
+                        handler()
+                    }
+                }
+            }
+        }(action, hk)
+    }
 }
 
 // Helper function for text capture
@@ -1223,7 +1262,7 @@ jobs:
             
 ```
 
-### Dependencies Note for Fyne and gohook
+### Dependencies Note for Fyne and golang.design/x/hotkey
 
 #### Fyne Build Requirements
 Fyne requires CGO for native GUI rendering:
@@ -1245,11 +1284,11 @@ sudo apt-get install -y \
 - Xcode Command Line Tools
 - No additional dependencies needed
 
-#### gohook Global Hotkey Requirements
+#### golang.design/x/hotkey Global Hotkey Requirements
 
 **Linux:**
 ```bash
-# Additional X11 libraries for hotkeys
+# Additional X11 libraries for system-wide hotkeys
 sudo apt-get install -y \
     libx11-dev libxtst-dev libxkbfile-dev \
     libxinerama-dev libxrandr-dev libxrender-dev \
@@ -1259,10 +1298,12 @@ sudo apt-get install -y \
 **Windows:**
 - Requires CGO enabled
 - MinGW-w64 or MSYS2 for CGO compilation
+- Hotkeys work system-wide without additional permissions
 
 **macOS:**
 - Requires CGO enabled
-- May require Accessibility permissions in System Preferences
+- Requires Accessibility permissions in System Preferences
+- Must request permission on first run for global hotkey access
 
 ### Release Process
 1. **Version Tagging**:
@@ -1704,12 +1745,15 @@ fyne package -os linux -icon assets/icon.png
 - [x] Show Base URL field only for OpenAI provider (hide for Claude/Gemini)
 - [x] Replace Character Limit text entry with number input field (default: 1000)
 - [x] Add consistent spacing between all form fields and sections
-- [x] Implement custom hotkey capture widget with real-time key detection
+- [x] Implement custom hotkey capture widget with real-time key detection using Fyne's native events
+- [x] **Switch from gohook to golang.design/x/hotkey** for system-wide global hotkeys (more reliable)
+- [x] Implement multi-provider configuration storage (map-based per-provider settings)
+- [x] Add automatic provider reinitialization on config changes
 - [x] Update Makefile: Add CGO_ENABLED=1, output to `./bin/` folder
 - [x] Update `.gitignore` to ignore `bin/` directory
 - [x] Update GitHub Actions workflow to use Fyne packaging commands
 - [x] Implement provider-specific field visibility (API Key, Model, Base URL)
-- [x] Fix gohook key event detection issues
+- [x] Fix status bar overflow with text wrapping and scrollable container
 - [x] Optimize binary size - Added `-s -w` ldflags for stripping
 
 ### Technical Details:
@@ -1738,15 +1782,15 @@ const (
 **Implemented in `ui/hotkey_capture.go`**
 
 Features:
-- Custom Fyne widget that listens for key combinations in real-time
+- Custom Fyne widget using native keyboard events (no external dependencies)
 - Click "Capture" button to start listening
-- Displays pressed keys as they are detected
+- Displays pressed keys as they are detected in real-time
 - Automatic detection of modifiers (Ctrl, Alt, Shift, Super/Cmd/Win)
 - Validates that combinations include at least one modifier
-- ESC to cancel capture
+- ESC to cancel capture, Enter to save
 - Clear button to reset hotkey
 - Professional UX similar to IDE shortcut configuration
-- Platform-independent key mapping
+- Platform-specific modifier names (Option on macOS, Alt on others)
 - Sorted modifier display (ctrl+alt+shift+key format)
 
 Key mapping includes:
@@ -1756,6 +1800,8 @@ Key mapping includes:
 - Function keys (F1-F12)
 - Special keys (Space, Enter, Tab, Backspace, Delete)
 - Arrow keys (Up, Down, Left, Right)
+
+**Note:** Uses Fyne's built-in keyboard event system for UI capture. System-wide hotkey listening is handled separately by `golang.design/x/hotkey` in `internal/input/hotkeys.go`.
 
 #### 5. Build Optimization
 Current binary size: ~42 MB

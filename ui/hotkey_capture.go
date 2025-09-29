@@ -1,19 +1,19 @@
 package ui
 
 import (
-	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	gohook "github.com/robotn/gohook"
 )
 
-// HotkeyCapture is a custom widget for capturing keyboard shortcuts
+// HotkeyCapture is a custom widget for capturing keyboard shortcuts using Fyne's keyboard events
 type HotkeyCapture struct {
 	widget.BaseWidget
 	binding    binding.String
@@ -21,22 +21,33 @@ type HotkeyCapture struct {
 	captureBtn *widget.Button
 	clearBtn   *widget.Button
 	container  *fyne.Container
+	entry      *captureEntry // Hidden entry to capture keyboard events
 
 	isCapturing bool
 	mu          sync.Mutex
-	stopChan    chan struct{}
-	hook        chan gohook.Event
 
-	pressedKeys map[uint16]string // Track pressed keys by rawcode
-	modifiers   []string
+	pressedKeys map[fyne.KeyName]bool
+	modifiers   map[fyne.KeyModifier]bool
+}
+
+// captureEntry is a hidden entry widget that captures keyboard events
+type captureEntry struct {
+	widget.Entry
+	parent *HotkeyCapture
+}
+
+func (e *captureEntry) TypedKey(key *fyne.KeyEvent) {
+	if e.parent != nil {
+		e.parent.handleKeyPress(key)
+	}
 }
 
 // NewHotkeyCapture creates a new hotkey capture widget
 func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture {
 	h := &HotkeyCapture{
 		binding:     binding,
-		pressedKeys: make(map[uint16]string),
-		stopChan:    make(chan struct{}),
+		pressedKeys: make(map[fyne.KeyName]bool),
+		modifiers:   make(map[fyne.KeyModifier]bool),
 	}
 
 	// Create label to display current/captured hotkey
@@ -48,6 +59,11 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 	if currentValue != "" {
 		h.label.SetText(currentValue)
 	}
+
+	// Create hidden entry for keyboard capture
+	h.entry = &captureEntry{parent: h}
+	h.entry.PlaceHolder = "Press keys when capturing..."
+	h.entry.Disable()
 
 	// Create capture button
 	h.captureBtn = widget.NewButtonWithIcon("Capture", theme.MediaRecordIcon(), func() {
@@ -65,7 +81,7 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 		nil, nil,
 		h.label,
 		container.NewHBox(h.clearBtn, h.captureBtn),
-		nil,
+		h.entry, // Hidden entry in center for keyboard capture
 	)
 
 	h.ExtendBaseWidget(h)
@@ -87,17 +103,19 @@ func (h *HotkeyCapture) startCapture() {
 	h.isCapturing = true
 	h.mu.Unlock()
 
+	// Reset pressed keys
+	h.pressedKeys = make(map[fyne.KeyName]bool)
+	h.modifiers = make(map[fyne.KeyModifier]bool)
+
 	// Update UI
 	h.label.SetText("Press keys... (ESC to cancel)")
 	h.captureBtn.SetText("Listening...")
 	h.captureBtn.Disable()
 
-	// Reset pressed keys
-	h.pressedKeys = make(map[uint16]string)
-	h.modifiers = []string{}
-
-	// Start listening in goroutine
-	go h.listenForKeys()
+	// Enable and focus the entry to capture keys
+	h.entry.Enable()
+	h.entry.SetText("")
+	// Note: Canvas focus would be set by the window
 }
 
 // stopCapture stops listening for keys
@@ -111,45 +129,26 @@ func (h *HotkeyCapture) stopCapture() {
 
 	h.isCapturing = false
 
-	// Stop the hook
-	if h.hook != nil {
-		gohook.End()
-		h.hook = nil
-	}
-
 	// Update UI
+	h.entry.Disable()
 	h.captureBtn.SetText("Capture")
 	h.captureBtn.Enable()
 }
 
-// listenForKeys listens for keyboard events
-func (h *HotkeyCapture) listenForKeys() {
-	// Start hook
-	h.hook = gohook.Start()
-	defer func() {
-		gohook.End()
-		h.hook = nil
-	}()
+// handleKeyPress processes key press events from Fyne
+func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-	for {
-		select {
-		case <-h.stopChan:
-			return
-		case evt := <-h.hook:
-			if !h.isCapturing {
-				return
-			}
-
-			h.handleKeyEvent(evt)
-		}
+	if !h.isCapturing {
+		return
 	}
-}
 
-// handleKeyEvent processes individual key events
-func (h *HotkeyCapture) handleKeyEvent(evt gohook.Event) {
 	// Handle ESC to cancel
-	if evt.Keychar == 27 && evt.Kind == gohook.KeyDown { // ESC
+	if key.Name == fyne.KeyEscape {
+		h.mu.Unlock()
 		h.stopCapture()
+		h.mu.Lock()
 		currentValue, _ := h.binding.Get()
 		if currentValue != "" {
 			h.label.SetText(currentValue)
@@ -159,175 +158,92 @@ func (h *HotkeyCapture) handleKeyEvent(evt gohook.Event) {
 		return
 	}
 
-	keyName := h.rawcodeToKeyName(evt.Rawcode, uint16(evt.Keychar))
-
-	if evt.Kind == gohook.KeyDown {
-		// Key pressed
-		if keyName != "" && keyName != "unknown" {
-			h.pressedKeys[evt.Rawcode] = keyName
-			h.updateDisplay()
-		}
-	} else if evt.Kind == gohook.KeyUp {
-		// Key released - save the combination
-		if len(h.pressedKeys) > 0 {
-			h.saveHotkey()
-			h.stopCapture()
-		}
+	// Handle Enter to save
+	if key.Name == fyne.KeyReturn || key.Name == fyne.KeyEnter {
+		h.mu.Unlock()
+		h.saveHotkey()
+		h.stopCapture()
+		h.mu.Lock()
+		return
 	}
-}
 
-// rawcodeToKeyName converts a rawcode to a readable key name
-func (h *HotkeyCapture) rawcodeToKeyName(rawcode uint16, keychar uint16) string {
-	// Common key mappings (platform-specific may vary)
-	switch rawcode {
-	// Modifiers
-	case 29, 157: // Ctrl
-		return "ctrl"
-	case 56, 184: // Alt
-		return "alt"
-	case 42, 54: // Shift
-		return "shift"
-	case 125, 126: // Windows/Super/Command
-		return getSystemModifierName()
-
-	// Special keys
-	case 57: // Space
-		return "space"
-	case 1: // ESC
-		return "esc"
-	case 28: // Enter
-		return "enter"
-	case 15: // Tab
-		return "tab"
-	case 14: // Backspace
-		return "backspace"
-	case 211: // Delete
-		return "delete"
-
-	// Function keys
-	case 59, 60, 61, 62, 63, 64, 65, 66, 67, 68:
-		return fmt.Sprintf("f%d", rawcode-58)
-	case 87, 88:
-		return fmt.Sprintf("f%d", rawcode-76)
-
-	// Arrow keys
-	case 72, 200: // Up
-		return "up"
-	case 80, 208: // Down
-		return "down"
-	case 75, 203: // Left
-		return "left"
-	case 77, 205: // Right
-		return "right"
-
-	// Letters (a-z)
-	case 30: return "a"
-	case 48: return "b"
-	case 46: return "c"
-	case 32: return "d"
-	case 18: return "e"
-	case 33: return "f"
-	case 34: return "g"
-	case 35: return "h"
-	case 23: return "i"
-	case 36: return "j"
-	case 37: return "k"
-	case 38: return "l"
-	case 50: return "m"
-	case 49: return "n"
-	case 24: return "o"
-	case 25: return "p"
-	case 16: return "q"
-	case 19: return "r"
-	case 31: return "s"
-	case 20: return "t"
-	case 22: return "u"
-	case 47: return "v"
-	case 17: return "w"
-	case 45: return "x"
-	case 21: return "y"
-	case 44: return "z"
-
-	// Numbers
-	case 2, 3, 4, 5, 6, 7, 8, 9, 10, 11:
-		return fmt.Sprintf("%d", rawcode-1)
-
+	// Check if this is a modifier key press and track it
+	switch key.Name {
+	case desktop.KeyShiftLeft, desktop.KeyShiftRight:
+		h.modifiers[fyne.KeyModifierShift] = true
+	case desktop.KeyControlLeft, desktop.KeyControlRight:
+		h.modifiers[fyne.KeyModifierControl] = true
+	case desktop.KeyAltLeft, desktop.KeyAltRight:
+		h.modifiers[fyne.KeyModifierAlt] = true
+	case desktop.KeySuperLeft, desktop.KeySuperRight:
+		h.modifiers[fyne.KeyModifierSuper] = true
 	default:
-		// Try to use keychar if available
-		if keychar != 0 && keychar < 128 {
-			return strings.ToLower(string(rune(keychar)))
+		// Track the actual key (not modifiers)
+		if !isModifierKey(key.Name) {
+			h.pressedKeys[key.Name] = true
 		}
-		return "unknown"
 	}
-}
 
-// getSystemModifierName returns the platform-specific modifier name
-func getSystemModifierName() string {
-	// This should match the GOOS
-	// For simplicity, we'll use "super" which works on Linux
-	// Can be enhanced to detect platform
-	return "super"
+	h.updateDisplay()
 }
 
 // updateDisplay updates the label with current pressed keys
 func (h *HotkeyCapture) updateDisplay() {
-	// Separate modifiers and regular keys
-	modifiers := []string{}
-	regularKeys := []string{}
+	parts := []string{}
 
-	for _, keyName := range h.pressedKeys {
-		if isModifier(keyName) {
-			if !contains(modifiers, keyName) {
-				modifiers = append(modifiers, keyName)
-			}
-		} else {
-			if !contains(regularKeys, keyName) {
-				regularKeys = append(regularKeys, keyName)
-			}
-		}
+	// Add modifiers in standard order
+	if h.modifiers[fyne.KeyModifierControl] {
+		parts = append(parts, "ctrl")
+	}
+	if h.modifiers[fyne.KeyModifierAlt] {
+		parts = append(parts, getAltName())
+	}
+	if h.modifiers[fyne.KeyModifierShift] {
+		parts = append(parts, "shift")
+	}
+	if h.modifiers[fyne.KeyModifierSuper] {
+		parts = append(parts, getSuperName())
 	}
 
-	// Sort modifiers in standard order: ctrl, alt, shift, super
-	sortedModifiers := sortModifiers(modifiers)
+	// Add regular keys
+	for keyName := range h.pressedKeys {
+		parts = append(parts, keyNameToString(keyName))
+	}
 
-	// Build display string
-	parts := append(sortedModifiers, regularKeys...)
-	display := strings.Join(parts, "+")
-
-	if display != "" {
-		h.label.SetText(display)
+	if len(parts) > 0 {
+		h.label.SetText(strings.Join(parts, "+"))
 	}
 }
 
 // saveHotkey saves the captured hotkey combination
 func (h *HotkeyCapture) saveHotkey() {
-	// Build final hotkey string
-	modifiers := []string{}
-	regularKeys := []string{}
+	parts := []string{}
 
-	for _, keyName := range h.pressedKeys {
-		if isModifier(keyName) {
-			if !contains(modifiers, keyName) {
-				modifiers = append(modifiers, keyName)
-			}
-		} else {
-			if !contains(regularKeys, keyName) && keyName != "unknown" {
-				regularKeys = append(regularKeys, keyName)
-			}
-		}
+	// Add modifiers in standard order
+	if h.modifiers[fyne.KeyModifierControl] {
+		parts = append(parts, "ctrl")
+	}
+	if h.modifiers[fyne.KeyModifierAlt] {
+		parts = append(parts, getAltName())
+	}
+	if h.modifiers[fyne.KeyModifierShift] {
+		parts = append(parts, "shift")
+	}
+	if h.modifiers[fyne.KeyModifierSuper] {
+		parts = append(parts, getSuperName())
+	}
+
+	// Add regular keys
+	for keyName := range h.pressedKeys {
+		parts = append(parts, keyNameToString(keyName))
 	}
 
 	// Must have at least one modifier and one regular key
-	if len(modifiers) == 0 || len(regularKeys) == 0 {
+	if len(h.modifiers) == 0 || len(h.pressedKeys) == 0 {
 		h.label.SetText("Invalid combination (need modifier + key)")
 		return
 	}
 
-	// Sort modifiers in standard order
-	sortedModifiers := sortModifiers(modifiers)
-
-	// Build final string
-	parts := append(sortedModifiers, regularKeys...)
 	hotkeyStr := strings.Join(parts, "+")
 
 	// Save to binding
@@ -343,41 +259,68 @@ func (h *HotkeyCapture) clearHotkey() {
 
 // Helper functions
 
-func isModifier(key string) bool {
-	return key == "ctrl" || key == "alt" || key == "shift" ||
-		   key == "super" || key == "cmd" || key == "win"
+// isModifierKey checks if the key is a modifier key
+func isModifierKey(key fyne.KeyName) bool {
+	return key == desktop.KeyShiftLeft || key == desktop.KeyShiftRight ||
+		key == desktop.KeyControlLeft || key == desktop.KeyControlRight ||
+		key == desktop.KeyAltLeft || key == desktop.KeyAltRight ||
+		key == desktop.KeySuperLeft || key == desktop.KeySuperRight
 }
 
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
+// keyNameToString converts Fyne KeyName to string representation
+func keyNameToString(key fyne.KeyName) string {
+	// Convert key name to lowercase
+	keyStr := strings.ToLower(string(key))
+
+	// Handle special keys
+	switch key {
+	case fyne.KeySpace:
+		return "space"
+	case fyne.KeyEscape:
+		return "esc"
+	case fyne.KeyReturn, fyne.KeyEnter:
+		return "enter"
+	case fyne.KeyTab:
+		return "tab"
+	case fyne.KeyBackspace:
+		return "backspace"
+	case fyne.KeyDelete:
+		return "delete"
+	case fyne.KeyUp:
+		return "up"
+	case fyne.KeyDown:
+		return "down"
+	case fyne.KeyLeft:
+		return "left"
+	case fyne.KeyRight:
+		return "right"
+	default:
+		// For regular keys, just return lowercase version
+		if len(keyStr) == 1 {
+			return keyStr
 		}
+		return keyStr
 	}
-	return false
 }
 
-func sortModifiers(mods []string) []string {
-	order := map[string]int{
-		"ctrl":  1,
-		"alt":   2,
-		"shift": 3,
-		"super": 4,
-		"cmd":   4,
-		"win":   4,
+// getAltName returns platform-specific alt key name
+func getAltName() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "option"
+	default:
+		return "alt"
 	}
+}
 
-	sorted := make([]string, len(mods))
-	copy(sorted, mods)
-
-	// Simple bubble sort
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if order[sorted[i]] > order[sorted[j]] {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
+// getSuperName returns platform-specific super key name
+func getSuperName() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "cmd"
+	case "windows":
+		return "win"
+	default:
+		return "super"
 	}
-
-	return sorted
 }
