@@ -215,11 +215,7 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		w.testAPIConnection()
 	})
 
-	// Small spacer for top spacing only
-	topSpacer := container.NewPadded(widget.NewLabel(""))
-
 	form := container.NewVBox(
-		topSpacer, // Top spacing from tab header
 		container.NewPadded(container.NewBorder(nil, nil, providerLabel, nil, providerSelect)),
 		widget.NewSeparator(),
 		container.NewPadded(container.NewBorder(nil, nil, apiKeyLabel, nil, apiKeyEntry)),
