@@ -15,15 +15,15 @@ func SimulateSelectAll() error {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS: Cmd+A
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("a", "cmd")
 	default:
 		// Windows/Linux: Ctrl+A
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("a", "ctrl")
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(30 * time.Millisecond)
 	return nil
 }
 
@@ -34,15 +34,15 @@ func SimulateCopy() error {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS: Cmd+C
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("c", "cmd")
 	default:
 		// Windows/Linux: Ctrl+C
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("c", "ctrl")
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(30 * time.Millisecond)
 	return nil
 }
 
@@ -53,15 +53,15 @@ func SimulatePaste() error {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS: Cmd+V
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("v", "cmd")
 	default:
 		// Windows/Linux: Ctrl+V
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("v", "ctrl")
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(30 * time.Millisecond)
 	return nil
 }
 
@@ -72,15 +72,15 @@ func SimulateCut() error {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS: Cmd+X
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("x", "cmd")
 	default:
 		// Windows/Linux: Ctrl+X
-		robotgo.KeySleep = 100
+		robotgo.KeySleep = 50
 		robotgo.KeyTap("x", "ctrl")
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(30 * time.Millisecond)
 	return nil
 }
 

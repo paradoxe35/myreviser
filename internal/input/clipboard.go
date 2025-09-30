@@ -113,7 +113,7 @@ func (c *ClipboardManager) CaptureSelectedText() (string, error) {
 	}
 
 	// Wait a bit for clipboard to update
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(75 * time.Millisecond)
 
 	// Get the new clipboard content
 	text, err := c.GetText()
@@ -147,7 +147,7 @@ func (c *ClipboardManager) ReplaceSelectedText(newText string) error {
 	}
 
 	// Wait a bit for paste to complete
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// Restore original clipboard
 	if err := c.Restore(); err != nil {
