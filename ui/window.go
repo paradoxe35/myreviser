@@ -303,8 +303,8 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
 		"2. Press keys ONE AT A TIME to build combination\n" +
 		"   (e.g., press Ctrl, then Alt, then Space)\n" +
-		"3. Press Enter to save or ESC to cancel\n" +
-		"4. Click 'Stop' to cancel capture\n\n" +
+		"3. Press Enter or click 'Save' to save\n" +
+		"4. Press ESC to cancel without saving\n\n" +
 		"Requirements:\n" +
 		"• At least one modifier (Ctrl, Alt, Shift, Super/Win/Cmd)\n" +
 		"• At least one regular key\n" +

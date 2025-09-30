@@ -103,9 +103,9 @@ func NewHotkeyCapture(binding binding.String, placeholder string) *HotkeyCapture
 		h.startCapture()
 	})
 
-	// Create stop button (initially hidden)
-	h.stopBtn = widget.NewButtonWithIcon("Stop", theme.MediaStopIcon(), func() {
-		h.stopCapture()
+	// Create stop button to save current combination (initially hidden)
+	h.stopBtn = widget.NewButtonWithIcon("Save", theme.ConfirmIcon(), func() {
+		h.saveAndStop()
 	})
 	h.stopBtn.Importance = widget.HighImportance
 	h.stopBtn.Hide()
@@ -177,7 +177,21 @@ func (h *HotkeyCapture) startCapture() {
 	}
 }
 
-// stopCapture stops listening for keys
+// saveAndStop saves the current combination and stops capture
+func (h *HotkeyCapture) saveAndStop() {
+	// Try to save the hotkey
+	h.saveHotkey()
+
+	// Check if save was successful (binding was updated)
+	currentValue, _ := h.binding.Get()
+	if currentValue != "" {
+		// Save successful, stop capture
+		h.stopCapture()
+	}
+	// If save failed (validation error), stay in capture mode
+}
+
+// stopCapture stops listening for keys (called after successful save or on cancel)
 func (h *HotkeyCapture) stopCapture() {
 	h.mu.Lock()
 	if !h.isCapturing {
@@ -233,8 +247,7 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	// Handle Enter to save
 	if key.Name == fyne.KeyReturn || key.Name == fyne.KeyEnter {
 		h.mu.Unlock()
-		h.saveHotkey()
-		h.stopCapture()
+		h.saveAndStop()
 		h.mu.Lock()
 		return
 	}
@@ -263,7 +276,7 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 func (h *HotkeyCapture) updateDisplay() {
 	parts := []string{}
 
-	// Add modifiers in standard order
+	// Add modifiers in standard order FIRST
 	if h.modifiers[fyne.KeyModifierControl] {
 		parts = append(parts, "ctrl")
 	}
@@ -277,12 +290,14 @@ func (h *HotkeyCapture) updateDisplay() {
 		parts = append(parts, getSuperName())
 	}
 
-	// Add regular keys in order they were pressed (sorted for consistency)
-	keyNames := make([]string, 0, len(h.pressedKeys))
-	for keyName := range h.pressedKeys {
-		keyNames = append(keyNames, keyNameToString(keyName))
+	// Then add regular keys
+	if len(h.pressedKeys) > 0 {
+		keyNames := make([]string, 0, len(h.pressedKeys))
+		for keyName := range h.pressedKeys {
+			keyNames = append(keyNames, keyNameToString(keyName))
+		}
+		parts = append(parts, keyNames...)
 	}
-	parts = append(parts, keyNames...)
 
 	if len(parts) > 0 {
 		h.entry.SetText(strings.Join(parts, "+"))
