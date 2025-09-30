@@ -283,6 +283,9 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectionLabel.TextStyle.Bold = true
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 	selectionCapture.window = w.Window // Set window reference for focus
+	// Allow modifier-only combo for Selection (e.g., Ctrl+Win on Windows)
+	selectionCapture.SetAllowModifierOnly(true)
+
 	// Connect callbacks to disable/enable global hotkeys during capture
 	selectionCapture.onCaptureStart = func() {
 		if w.hotkeyManager != nil {

@@ -32,8 +32,9 @@ type HotkeyCapture struct {
 	isCapturing bool
 	mu          sync.Mutex
 
-	pressedKeys map[fyne.KeyName]bool
-	modifiers   map[fyne.KeyModifier]bool
+	pressedKeys       map[fyne.KeyName]bool
+	modifiers         map[fyne.KeyModifier]bool
+	allowModifierOnly bool
 }
 
 // captureEntry is a custom entry widget that captures keyboard events with white background
@@ -186,15 +187,14 @@ func (h *HotkeyCapture) startCapture() {
 // saveAndStop saves the current combination and stops capture
 func (h *HotkeyCapture) saveAndStop() {
 	// Try to save the hotkey
-	h.saveHotkey()
+	success := h.saveHotkey()
 
-	// Check if save was successful (binding was updated)
-	currentValue, _ := h.binding.Get()
-	if currentValue != "" {
-		// Save successful, stop capture
-		h.stopCapture()
-	}
-	// If save failed (validation error), stay in capture mode
+	// Always stop capture (restore previous value if save failed)
+	h.stopCapture()
+
+	// If save failed, the error message was shown briefly in the label
+	// stopCapture will restore the correct previous value
+	_ = success
 }
 
 // stopCapture stops listening for keys (called after successful save or on cancel)
@@ -236,9 +236,9 @@ func (h *HotkeyCapture) stopCapture() {
 // handleKeyPress processes key press events from Fyne
 func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	if !h.isCapturing {
+		h.mu.Unlock()
 		return
 	}
 
@@ -246,7 +246,6 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	if key.Name == fyne.KeyEscape {
 		h.mu.Unlock()
 		h.stopCapture()
-		h.mu.Lock()
 		return
 	}
 
@@ -254,7 +253,6 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	if key.Name == fyne.KeyReturn || key.Name == fyne.KeyEnter {
 		h.mu.Unlock()
 		h.saveAndStop()
-		h.mu.Lock()
 		return
 	}
 
@@ -276,6 +274,7 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	}
 
 	h.updateDisplay()
+	h.mu.Unlock()
 }
 
 // updateDisplay updates the entry with current pressed keys
@@ -312,8 +311,8 @@ func (h *HotkeyCapture) updateDisplay() {
 	}
 }
 
-// saveHotkey saves the captured hotkey combination
-func (h *HotkeyCapture) saveHotkey() {
+// saveHotkey saves the captured hotkey combination and returns true if successful
+func (h *HotkeyCapture) saveHotkey() bool {
 	parts := []string{}
 
 	// Add modifiers in standard order
@@ -337,26 +336,39 @@ func (h *HotkeyCapture) saveHotkey() {
 	}
 	parts = append(parts, keyNames...)
 
-	// Must have at least one modifier and one regular key
-	if len(h.modifiers) == 0 || len(h.pressedKeys) == 0 {
-		h.displayLabel.SetText("Invalid combination (need modifier + key)")
-		return
+	// Validate combination: require at least one modifier and either a regular key
+	// or (if allowed) a supported modifier-only combo like Ctrl+Win/Cmd/Super
+	valid := false
+	if len(h.modifiers) > 0 {
+		if len(h.pressedKeys) > 0 {
+			valid = true
+		} else if h.allowModifierOnly && isModifierOnlyAllowed(h.modifiers) {
+			valid = true
+		}
+	}
+	if !valid {
+		h.entry.SetText("❌ Invalid combination (need modifier + key)")
+		return false
 	}
 
 	hotkeyStr := strings.Join(parts, "+")
 
-	// Check if any sibling has the same keybinding
+	// Check if any sibling has the same keybinding (excluding self)
 	for _, sibling := range h.siblings {
+		// Skip if sibling is self
+		if sibling == h {
+			continue
+		}
 		siblingValue, _ := sibling.binding.Get()
-		if siblingValue == hotkeyStr {
-			h.displayLabel.SetText("Duplicate! Already used by other hotkey")
-			return
+		if siblingValue != "" && siblingValue == hotkeyStr {
+			h.entry.SetText("❌ Duplicate! '" + hotkeyStr + "' is already used")
+			return false
 		}
 	}
 
 	// Save to binding
 	h.binding.Set(hotkeyStr)
-	h.displayLabel.SetText(hotkeyStr)
+	return true
 }
 
 // clearHotkey clears the current hotkey
@@ -391,6 +403,11 @@ func (h *HotkeyCapture) SetSiblings(siblings ...*HotkeyCapture) {
 	h.siblings = siblings
 }
 
+// SetAllowModifierOnly allows accepting modifier-only combinations (e.g., Ctrl+Win)
+func (h *HotkeyCapture) SetAllowModifierOnly(allow bool) {
+	h.allowModifierOnly = allow
+}
+
 // Helper functions
 
 // isModifierKey checks if the key is a modifier key
@@ -399,6 +416,11 @@ func isModifierKey(key fyne.KeyName) bool {
 		key == desktop.KeyControlLeft || key == desktop.KeyControlRight ||
 		key == desktop.KeyAltLeft || key == desktop.KeyAltRight ||
 		key == desktop.KeySuperLeft || key == desktop.KeySuperRight
+}
+
+// isModifierOnlyAllowed returns true if modifiers contain Ctrl and Super (Win/Cmd/Super)
+func isModifierOnlyAllowed(mods map[fyne.KeyModifier]bool) bool {
+	return mods[fyne.KeyModifierControl] && mods[fyne.KeyModifierSuper]
 }
 
 // keyNameToString converts Fyne KeyName to string representation
