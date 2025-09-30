@@ -48,6 +48,12 @@ func (e *captureEntry) TypedKey(key *fyne.KeyEvent) {
 	}
 }
 
+// TypedRune prevents normal text input during capture
+func (e *captureEntry) TypedRune(r rune) {
+	// Block all typed characters - we only want key events
+	// This prevents 'f' from appearing as text when pressing F key
+}
+
 func (e *captureEntry) CreateRenderer() fyne.WidgetRenderer {
 	e.ExtendBaseWidget(e)
 	renderer := e.Entry.CreateRenderer()
