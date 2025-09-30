@@ -301,13 +301,17 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 
 	// Hotkey instructions
 	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
-		"2. Press your desired key combination\n" +
+		"2. Press keys ONE AT A TIME to build combination\n" +
+		"   (e.g., press Ctrl, then Alt, then Space)\n" +
 		"3. Press Enter to save or ESC to cancel\n" +
 		"4. Click 'Stop' to cancel capture\n\n" +
-		"Note: You must use at least one modifier key\n" +
-		"(Ctrl, Alt, Shift, or Super/Win/Cmd).\n\n" +
-		"Important: Global hotkeys are disabled during capture.\n" +
-		"Some combinations may be reserved by your OS.")
+		"Requirements:\n" +
+		"• At least one modifier (Ctrl, Alt, Shift, Super/Win/Cmd)\n" +
+		"• At least one regular key\n" +
+		"• Each hotkey must be unique\n" +
+		"• Maximum 3 regular keys per combination\n\n" +
+		"Note: Only one hotkey can be captured at a time.\n" +
+		"Global hotkeys are disabled during capture.")
 	instructionsLabel.Wrapping = fyne.TextWrapWord
 	instructions := widget.NewCard("", "How to Capture Hotkeys", instructionsLabel)
 

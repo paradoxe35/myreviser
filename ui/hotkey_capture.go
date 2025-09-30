@@ -22,11 +22,11 @@ type HotkeyCapture struct {
 	stopBtn        *widget.Button
 	clearBtn       *widget.Button
 	container      *fyne.Container
-	displayLabel   *widget.Label  // Label to display saved keybinding
-	entry          *captureEntry  // Entry to capture keyboard events
-	window         fyne.Window    // Reference to parent window for focus
-	onCaptureStart func()         // Callback when capture starts
-	onCaptureStop  func()         // Callback when capture stops
+	displayLabel   *widget.Label    // Label to display saved keybinding
+	entry          *captureEntry    // Entry to capture keyboard events
+	window         fyne.Window      // Reference to parent window for focus
+	onCaptureStart func()           // Callback when capture starts
+	onCaptureStop  func()           // Callback when capture stops
 	siblings       []*HotkeyCapture // Other capture widgets to disable during capture
 
 	isCapturing bool
@@ -323,6 +323,15 @@ func (h *HotkeyCapture) saveHotkey() {
 	}
 
 	hotkeyStr := strings.Join(parts, "+")
+
+	// Check if any sibling has the same keybinding
+	for _, sibling := range h.siblings {
+		siblingValue, _ := sibling.binding.Get()
+		if siblingValue == hotkeyStr {
+			h.displayLabel.SetText("Duplicate! Already used by other hotkey")
+			return
+		}
+	}
 
 	// Save to binding
 	h.binding.Set(hotkeyStr)
