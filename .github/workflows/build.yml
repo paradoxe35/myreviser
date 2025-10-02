@@ -195,9 +195,19 @@ jobs:
           cp myreviser-linux-${{ matrix.arch }} dist/deb/usr/local/bin/myreviser
           chmod +x dist/deb/usr/local/bin/myreviser
 
-          # Sanitize version for Debian (replace invalid chars with -)
-          DEB_VERSION=$(echo "${GITHUB_REF_NAME#v}" | sed 's/[^0-9a-zA-Z.]/-/g' | sed 's/^-//' | sed 's/-$//')
+          # Sanitize version for Debian (must start with digit)
+          RAW_VERSION="${GITHUB_REF_NAME#v}"
+          # If version doesn't start with digit, use 0.0.0 prefix
+          if ! echo "$RAW_VERSION" | grep -q '^[0-9]'; then
+            DEB_VERSION="0.0.0-${RAW_VERSION}"
+          else
+            DEB_VERSION="$RAW_VERSION"
+          fi
+          # Replace invalid chars with dash
+          DEB_VERSION=$(echo "$DEB_VERSION" | sed 's/[^0-9a-zA-Z.]/-/g' | sed 's/^-//' | sed 's/-$//')
+          # Fallback if empty
           [ -z "$DEB_VERSION" ] && DEB_VERSION="0.0.0-dev"
+          echo "Debian version: $DEB_VERSION"
 
           # Create control file
           cat > dist/deb/DEBIAN/control <<EOF
@@ -522,18 +532,90 @@ jobs:
           fi
           echo "MyReviser.app created successfully"
 
-      - name: Sign app bundle (if certificates available)
-        if: env.MACOS_CERTIFICATE != ''
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      - name: Update Info.plist for tray app
         run: |
-          # Import certificate
-          # codesign --deep --force --verify --verbose --sign "Developer ID Application" MyReviser.app
+          # Add LSUIElement to hide from Dock (tray-only app)
+          /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" MyReviser.app/Contents/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :LSUIElement true" MyReviser.app/Contents/Info.plist
+
+          # Verify it was added
+          echo "Info.plist updated with LSUIElement:"
+          /usr/libexec/PlistBuddy -c "Print :LSUIElement" MyReviser.app/Contents/Info.plist
+
+      - name: Ad-hoc sign app bundle (inside-out approach)
+        run: |
+          echo "Ad-hoc signing MyReviser.app (without hardened runtime/entitlements)..."
+
+          # Determine actual executable name from Info.plist
+          EXEC=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" MyReviser.app/Contents/Info.plist)
+          echo "CFBundleExecutable=$EXEC"
+
+          # Sign from inside-out (Apple best practice):
+          # 1. Sign any nested frameworks first (if they exist)
+          echo "Signing frameworks (if any)..."
+          find MyReviser.app/Contents/Frameworks -name "*.framework" -exec codesign --force --sign - {} \; 2>/dev/null || true
+
+          # 2. Sign the main executable
+          echo "Signing executable: ${EXEC}"
+          codesign --force --sign - "MyReviser.app/Contents/MacOS/${EXEC}"
+
+          # 3. Sign the entire app bundle (without --deep since contents already signed)
+          echo "Signing app bundle..."
+          codesign --force --sign - MyReviser.app
+
+          # Verify the signature
+          echo "Verifying signature..."
+          codesign --verify --verbose=4 MyReviser.app
+
+          echo "Ad-hoc signing completed successfully"
+
+      - name: Remove quarantine attributes
+        run: |
+          # Remove quarantine attribute to prevent "damaged" error
+          xattr -cr MyReviser.app || true
+
+      - name: Create installation README
+        run: |
+          cat > INSTALL_MACOS.txt <<'EOF'
+          MyReviser for macOS - Installation Instructions
+
+          FIRST LAUNCH:
+
+          When you first open MyReviser, you'll see a security warning:
+          "MyReviser cannot be opened because it is from an unidentified developer"
+
+          METHOD 1 (Recommended):
+          1. Right-click (or Control+click) MyReviser.app
+          2. Select "Open" from the menu
+          3. Click "Open" in the security dialog
+          4. MyReviser will launch and appear in your menu bar (tray icon)
+
+          METHOD 2 (System Settings):
+          1. Try to open MyReviser normally (it will be blocked)
+          2. Go to System Settings > Privacy & Security
+          3. Look for "MyReviser was blocked" message
+          4. Click "Open Anyway"
+          5. Click "Open" in the confirmation dialog
+
+          METHOD 3 (Terminal - if above methods don't work):
+          1. Open Terminal (Applications > Utilities > Terminal)
+          2. Type: xattr -cr
+          3. Drag MyReviser.app into Terminal window
+          4. Press Enter
+          5. Open MyReviser normally
+
+          IMPORTANT:
+          - MyReviser runs in the menu bar (no Dock icon)
+          - Grant Accessibility permissions when prompted for global hotkeys
+          - After first launch, it will open normally
+
+          Support: https://github.com/paradoxe35/myreviser
+          EOF
 
       - name: Create ZIP archive
         run: |
-          zip -r myreviser-darwin-${{ matrix.arch }}.zip MyReviser.app
+          # Create zip without extended attributes to avoid Gatekeeper issues
+          zip -r -X myreviser-darwin-${{ matrix.arch }}.zip MyReviser.app INSTALL_MACOS.txt
 
       - name: Create DMG
         run: |
@@ -626,7 +708,14 @@ jobs:
             ## Installation
 
             **Windows**: Run installer or extract portable ZIP
-            **macOS**: Open DMG and drag to Applications
+
+            **macOS**:
+            1. Download and extract ZIP or open DMG
+            2. First launch: Right-click MyReviser.app > Open > Click "Open"
+            3. Or go to System Settings > Privacy & Security > Click "Open Anyway"
+            4. MyReviser appears in menu bar (no Dock icon)
+            5. Grant Accessibility permissions when prompted
+
             **Linux**:
             ```bash
             # AppImage
