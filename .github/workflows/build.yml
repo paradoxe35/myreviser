@@ -471,12 +471,10 @@ jobs:
       - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
+          GOOS: darwin
+          GOARCH: ${{ matrix.arch }}
         run: |
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            fyne package --target darwin/arm64 --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
-          else
-            fyne package --target darwin/amd64 --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
-          fi
+          fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
 
       - name: Verify .app bundle created
         run: |
