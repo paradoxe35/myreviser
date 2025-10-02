@@ -130,7 +130,7 @@ func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
 
 	// Wait for clipboard to update after simulated Ctrl+C
 	// This prevents race condition where we read before the OS updates clipboard
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Get the captured text (now in clipboard)
 	text, err := c.GetText()

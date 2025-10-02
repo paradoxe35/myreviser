@@ -116,22 +116,33 @@ func (p *Processor) ProcessSelectAll() error {
 
 	logger.Info("Starting select all revision")
 
+	// Initial delay to allow any ongoing clipboard operations to finish
+	// and ensure the hotkey press is fully processed
+	time.Sleep(200 * time.Millisecond)
+
 	// Save current clipboard
 	if err := p.clipboardManager.SaveCurrent(); err != nil {
 		return fmt.Errorf("failed to save clipboard: %w", err)
 	}
+
+	// Small delay saving
+	time.Sleep(100 * time.Millisecond)
 
 	// Select all text
 	if err := input.FFISimulateSelectAll(); err != nil {
 		return fmt.Errorf("failed to select all: %w", err)
 	}
 
+	// Small delay after select all before copy
+	time.Sleep(100 * time.Millisecond)
+
 	// Copy to clipboard
 	if err := input.FFISimulateCopy(); err != nil {
 		return fmt.Errorf("failed to copy: %w", err)
 	}
-	// Allow clipboard to update before reading
-	time.Sleep(100 * time.Millisecond)
+
+	// Allow clipboard to update before reading (increased from 100ms)
+	time.Sleep(200 * time.Millisecond)
 
 	// Get text from clipboard
 	text, err := p.clipboardManager.GetText()
@@ -151,6 +162,10 @@ func (p *Processor) ProcessSelectAll() error {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to select all for paste: %w", err)
 	}
+
+	// add small delay
+	time.Sleep(100 * time.Millisecond)
+
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to replace text: %w", err)
@@ -185,7 +200,10 @@ func (p *Processor) ProcessSelection() error {
 
 	logger.Info("Starting selection revision")
 
-	// Capture selected text (saves clipboard, copies, restores)
+	// Initial delay to allow any ongoing clipboard operations to finish
+	time.Sleep(200 * time.Millisecond)
+
+	// Capture selected text (saves clipboard, copies, returns text)
 	text, err := p.clipboardManager.CaptureSelectedText()
 	if err != nil {
 		return fmt.Errorf("failed to capture selected text: %w", err)
