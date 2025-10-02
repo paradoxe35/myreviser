@@ -109,7 +109,25 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -icon assets/icon.png -o myreviser-linux-${{ matrix.arch }}
+          # fyne package creates myreviser.tar.xz for Linux
+          fyne package --icon assets/icon.png --name myreviser --release
+
+          # Find and extract the tar archive (could be .tar.xz or .tar.gz)
+          TAR_FILE=$(ls myreviser.tar.* 2>/dev/null | head -n 1)
+          if [ -n "$TAR_FILE" ]; then
+            echo "Extracting $TAR_FILE"
+            tar -xf "$TAR_FILE"
+
+            # The extracted structure is usr/local/bin/myreviser
+            mv usr/local/bin/myreviser myreviser-linux-${{ matrix.arch }}
+
+            # Clean up
+            rm -rf usr "$TAR_FILE"
+          else
+            echo "Error: No tar archive found"
+            ls -la
+            exit 1
+          fi
 
       - name: Create portable archive
         run: |
@@ -303,7 +321,11 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -icon assets/icon.ico -o myreviser-windows-${{ matrix.arch }}.exe
+          fyne package --icon assets/icon.ico --name myreviser --release
+          # fyne package creates myreviser.exe, rename it
+          if (Test-Path "myreviser.exe") {
+            Move-Item myreviser.exe myreviser-windows-${{ matrix.arch }}.exe
+          }
 
       - name: Create portable ZIP
         run: |
