@@ -41,7 +41,7 @@ impl SimpleHotkeyManager {
         action: String,
         callback: HotkeyCallback,
     ) -> Result<(), String> {
-        // Parse binding (e.g., "ctrl+alt+space")
+        // Parse binding (e.g., "ctrl+alt+space" or "ctrl+win")
         let parts: Vec<&str> = binding.split('+').map(|s| s.trim()).collect();
         if parts.is_empty() {
             return Err("Empty binding".to_string());
@@ -53,20 +53,57 @@ impl SimpleHotkeyManager {
         if parts.len() == 1 {
             key = parts[0].to_lowercase();
         } else {
-            modifiers = parts[..parts.len() - 1]
-                .iter()
-                .map(|s| s.to_lowercase())
-                .collect();
-            key = parts[parts.len() - 1].to_lowercase();
+            // Check if last part is a modifier (for modifier-only hotkeys like ctrl+win)
+            let last_part = parts[parts.len() - 1].to_lowercase();
+            let is_modifier = last_part == "ctrl"
+                || last_part == "control"
+                || last_part == "alt"
+                || last_part == "option"
+                || last_part == "shift"
+                || last_part == "meta"
+                || last_part == "cmd"
+                || last_part == "super"
+                || last_part == "win";
+
+            if is_modifier && parts.len() >= 2 {
+                // All parts are modifiers (e.g., "ctrl+win")
+                modifiers = parts.iter().map(|s| s.to_lowercase()).collect();
+                key = String::new(); // Empty key means modifier-only binding
+            } else {
+                // Normal binding with modifiers + key
+                modifiers = parts[..parts.len() - 1]
+                    .iter()
+                    .map(|s| s.to_lowercase())
+                    .collect();
+                key = last_part;
+            }
         }
 
         let binding_obj = HotkeyBinding {
             binding: binding.clone(),
-            action,
+            action: action.clone(),
             callback,
-            modifiers,
-            key,
+            modifiers: modifiers.clone(),
+            key: key.clone(),
         };
+
+        // Log registration for debugging
+        if key.is_empty() {
+            tracing::info!(
+                "Registered modifier-only hotkey: {} (modifiers: {:?}, action: {})",
+                binding,
+                modifiers,
+                action
+            );
+        } else {
+            tracing::info!(
+                "Registered hotkey: {} (modifiers: {:?}, key: {}, action: {})",
+                binding,
+                modifiers,
+                key,
+                action
+            );
+        }
 
         self.bindings.lock().push(binding_obj);
         Ok(())
@@ -96,36 +133,72 @@ impl SimpleHotkeyManager {
 
                 match event.event_type {
                     EventType::KeyPress(key) => {
+                        // Track previous modifier states
+                        let prev_ctrl = ctrl_pressed;
+                        let prev_alt = alt_pressed;
+                        let prev_shift = shift_pressed;
+                        let prev_meta = meta_pressed;
+
                         // Update modifier states
                         match key {
                             Key::ControlLeft | Key::ControlRight => ctrl_pressed = true,
                             Key::Alt | Key::AltGr => alt_pressed = true,
                             Key::ShiftLeft | Key::ShiftRight => shift_pressed = true,
                             Key::MetaLeft | Key::MetaRight => meta_pressed = true,
-                            _ => {
-                                // Check if this keypress matches any binding
-                                let key_str = key_to_string(&key);
-                                let bindings_lock = bindings.lock();
+                            _ => {}
+                        }
 
-                                for binding in bindings_lock.iter() {
-                                    if matches_binding(
-                                        &binding.modifiers,
-                                        &binding.key,
-                                        ctrl_pressed,
-                                        alt_pressed,
-                                        shift_pressed,
-                                        meta_pressed,
-                                        &key_str,
-                                    ) {
-                                        // Trigger callback
-                                        // SAFETY: We leak the CString and let the Go side free it
-                                        // to ensure the pointer remains valid during the callback
-                                        let action_cstr =
-                                            std::ffi::CString::new(binding.action.clone()).unwrap();
-                                        let action_ptr = action_cstr.into_raw();
-                                        (binding.callback)(action_ptr);
-                                        // Go side MUST call myreviser_free_string on this pointer
-                                    }
+                        // Check bindings after modifier state update
+                        let bindings_lock = bindings.lock();
+
+                        for binding in bindings_lock.iter() {
+                            // For modifier-only bindings (empty key)
+                            if binding.key.is_empty() {
+                                // Trigger when all required modifiers are pressed and state changed
+                                if matches_modifier_only_binding(
+                                    &binding.modifiers,
+                                    ctrl_pressed,
+                                    alt_pressed,
+                                    shift_pressed,
+                                    meta_pressed,
+                                    prev_ctrl,
+                                    prev_alt,
+                                    prev_shift,
+                                    prev_meta,
+                                ) {
+                                    tracing::info!(
+                                        "Modifier-only hotkey triggered: {} (action: {})",
+                                        binding.binding,
+                                        binding.action
+                                    );
+                                    // Trigger callback
+                                    let action_cstr =
+                                        std::ffi::CString::new(binding.action.clone()).unwrap();
+                                    let action_ptr = action_cstr.into_raw();
+                                    (binding.callback)(action_ptr);
+                                }
+                            } else {
+                                // For regular key bindings
+                                let key_str = key_to_string(&key);
+                                if matches_binding(
+                                    &binding.modifiers,
+                                    &binding.key,
+                                    ctrl_pressed,
+                                    alt_pressed,
+                                    shift_pressed,
+                                    meta_pressed,
+                                    &key_str,
+                                ) {
+                                    tracing::info!(
+                                        "Hotkey triggered: {} (action: {})",
+                                        binding.binding,
+                                        binding.action
+                                    );
+                                    // Trigger callback
+                                    let action_cstr =
+                                        std::ffi::CString::new(binding.action.clone()).unwrap();
+                                    let action_ptr = action_cstr.into_raw();
+                                    (binding.callback)(action_ptr);
                                 }
                             }
                         }
@@ -239,7 +312,7 @@ fn matches_binding(
     let has_ctrl = binding_modifiers.contains(&"ctrl".to_string())
         || binding_modifiers.contains(&"control".to_string());
     let has_alt = binding_modifiers.contains(&"alt".to_string())
-        || binding_modifiers.contains(&"option".to_string());  // macOS uses "option"
+        || binding_modifiers.contains(&"option".to_string()); // macOS uses "option"
     let has_shift = binding_modifiers.contains(&"shift".to_string());
     let has_meta = binding_modifiers.contains(&"meta".to_string())
         || binding_modifiers.contains(&"cmd".to_string())
@@ -247,6 +320,48 @@ fn matches_binding(
         || binding_modifiers.contains(&"win".to_string());
 
     ctrl == has_ctrl && alt == has_alt && shift == has_shift && meta == has_meta
+}
+
+fn matches_modifier_only_binding(
+    binding_modifiers: &[String],
+    ctrl: bool,
+    alt: bool,
+    shift: bool,
+    meta: bool,
+    prev_ctrl: bool,
+    prev_alt: bool,
+    prev_shift: bool,
+    prev_meta: bool,
+) -> bool {
+    // Check what modifiers the binding requires
+    let has_ctrl = binding_modifiers.contains(&"ctrl".to_string())
+        || binding_modifiers.contains(&"control".to_string());
+    let has_alt = binding_modifiers.contains(&"alt".to_string())
+        || binding_modifiers.contains(&"option".to_string());
+    let has_shift = binding_modifiers.contains(&"shift".to_string());
+    let has_meta = binding_modifiers.contains(&"meta".to_string())
+        || binding_modifiers.contains(&"cmd".to_string())
+        || binding_modifiers.contains(&"super".to_string())
+        || binding_modifiers.contains(&"win".to_string());
+
+    // All required modifiers must be pressed
+    let modifiers_match =
+        ctrl == has_ctrl && alt == has_alt && shift == has_shift && meta == has_meta;
+
+    // Trigger only when:
+    // 1. All required modifiers are now pressed
+    // 2. At least one required modifier just changed to pressed (not all were already pressed)
+    if !modifiers_match {
+        return false;
+    }
+
+    // Check if any required modifier just became pressed
+    let ctrl_just_pressed = has_ctrl && ctrl && !prev_ctrl;
+    let alt_just_pressed = has_alt && alt && !prev_alt;
+    let shift_just_pressed = has_shift && shift && !prev_shift;
+    let meta_just_pressed = has_meta && meta && !prev_meta;
+
+    ctrl_just_pressed || alt_just_pressed || shift_just_pressed || meta_just_pressed
 }
 
 // ============================================================================
