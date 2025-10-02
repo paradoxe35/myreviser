@@ -110,8 +110,9 @@ func (c *FFIClipboardManager) Close() {
 }
 
 // CaptureSelectedText captures the currently selected text
+// Note: Saves clipboard but does NOT restore - caller must restore after paste
 func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
-	// Save current clipboard
+	// Save current clipboard for later restore
 	if err := c.SaveCurrent(); err != nil {
 		return "", fmt.Errorf("failed to save clipboard: %w", err)
 	}
@@ -131,28 +132,20 @@ func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
 	// This prevents race condition where we read before the OS updates clipboard
 	time.Sleep(100 * time.Millisecond)
 
-	// Get the new clipboard content
+	// Get the captured text (now in clipboard)
 	text, err := c.GetText()
 	if err != nil {
 		return "", fmt.Errorf("failed to get clipboard text: %w", err)
 	}
 
-	// Restore original clipboard
-	if err := c.Restore(); err != nil {
-		// Log error but don't fail
-		fmt.Printf("Warning: failed to restore clipboard: %v\n", err)
-	}
-
+	// Return the captured text
+	// Original clipboard is saved and will be restored by caller after paste
 	return text, nil
 }
 
 // ReplaceSelectedText replaces the selected text with new text
+// Note: Does NOT save/restore clipboard - caller is responsible for that
 func (c *FFIClipboardManager) ReplaceSelectedText(newText string) error {
-	// Save current clipboard
-	if err := c.SaveCurrent(); err != nil {
-		return fmt.Errorf("failed to save clipboard: %w", err)
-	}
-
 	// Set new text to clipboard
 	if err := c.SetText(newText); err != nil {
 		return fmt.Errorf("failed to set clipboard text: %w", err)
@@ -169,15 +162,9 @@ func (c *FFIClipboardManager) ReplaceSelectedText(newText string) error {
 		return fmt.Errorf("failed to simulate paste: %w", err)
 	}
 
-	// Wait for paste operation to complete before restoring clipboard
-	// This prevents race condition where we restore before paste finishes
-	time.Sleep(100 * time.Millisecond)
-
-	// Restore original clipboard
-	if err := c.Restore(); err != nil {
-		// Log error but don't fail
-		fmt.Printf("Warning: failed to restore clipboard: %v\n", err)
-	}
+	// Wait for paste operation to complete
+	// Increased delay for more reliable paste completion
+	time.Sleep(300 * time.Millisecond)
 
 	return nil
 }

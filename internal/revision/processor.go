@@ -190,7 +190,7 @@ func (p *Processor) ProcessSelection() error {
 
 	logger.Info("Starting selection revision")
 
-	// Capture selected text
+	// Capture selected text (saves clipboard, copies, restores)
 	text, err := p.clipboardManager.CaptureSelectedText()
 	if err != nil {
 		return fmt.Errorf("failed to capture selected text: %w", err)
@@ -206,9 +206,14 @@ func (p *Processor) ProcessSelection() error {
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
-	// Replace selected text
+	// Replace selected text (paste revised text)
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		return fmt.Errorf("failed to replace selected text: %w", err)
+	}
+
+	// Restore original clipboard AFTER paste completes
+	if err := p.clipboardManager.Restore(); err != nil {
+		logger.Warn("Failed to restore clipboard after paste", "error", err)
 	}
 
 	logger.Info("Selection revision completed")

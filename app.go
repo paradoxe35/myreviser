@@ -54,6 +54,15 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Setup hotkeys
 	application.setupHotkeys()
 
+	// Listen for config changes to reload hotkeys
+	config.RegisterListener(func(newCfg *config.Config) {
+		logger.Info("Config changed, reloading hotkeys")
+		// Update application config reference
+		application.config = newCfg
+		// Reload hotkeys with new bindings
+		application.reloadHotkeysFromConfig()
+	})
+
 	// Setup system tray if available
 	if desk, ok := app.(desktop.App); ok {
 		ui.SetupSystemTray(desk, mainWindow)
@@ -106,6 +115,41 @@ func (a *Application) setupHotkeys() {
 			logger.Info("Text revised successfully")
 		}
 	})
+}
+
+// reloadHotkeysFromConfig stops current hotkeys and re-registers with new config
+func (a *Application) reloadHotkeysFromConfig() {
+	logger.Info("Reloading hotkeys from updated config")
+
+	// Stop current hotkey manager
+	if a.hotkeyManager != nil {
+		a.hotkeyManager.Stop()
+		a.hotkeyManager.Close()
+	}
+
+	// Create new hotkey manager
+	newManager := input.NewFFIHotkeyManager()
+	if newManager == nil {
+		logger.Error("Failed to create new hotkey manager")
+		a.notifications.ShowError("Hotkey Reload Failed", "Failed to reload hotkeys")
+		return
+	}
+
+	a.hotkeyManager = newManager
+
+	// Re-register hotkeys with new config
+	a.setupHotkeys()
+
+	// Start the new hotkey manager
+	if err := a.hotkeyManager.Start(); err != nil {
+		logger.Error("Failed to start new hotkey manager", "error", err)
+		a.notifications.ShowError("Hotkey Reload Failed", "Failed to start hotkeys: "+err.Error())
+		return
+	}
+
+	logger.Info("Hotkeys reloaded successfully",
+		"select_all", a.config.Hotkeys.SelectAll,
+		"selection", a.config.Hotkeys.Selection)
 }
 
 // Start starts the application
