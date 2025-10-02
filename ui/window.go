@@ -217,7 +217,7 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 	modelLabel.TextStyle.Bold = true
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
-	modelEntry.PlaceHolder = "e.g., gpt-4o-mini"
+	modelEntry.PlaceHolder = "e.g., gpt-4o"
 
 	// Base URL (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL (optional):")
