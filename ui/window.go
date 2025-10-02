@@ -183,9 +183,37 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 	selected, _ := w.providerBinding.Get()
 
+	// Provider Selection Section
+	providerSection := w.createProviderSelectionSection(selected)
+
+	// Configuration Section
+	configSection := w.createProviderConfigSection()
+
+	// Connection Test Section
+	testSection := w.createConnectionTestSection()
+
+	// Set initial visibility based on provider
+	if selected != "openai" && w.baseURLContainer != nil {
+		w.baseURLContainer.Hide()
+	}
+
+	// Main layout with proper spacing
+	content := container.NewVBox(
+		container.NewPadded(providerSection),
+		widget.NewSeparator(),
+		container.NewPadded(configSection),
+		widget.NewSeparator(),
+		container.NewPadded(testSection),
+	)
+
+	return content
+}
+
+func (w *MainWindow) createProviderSelectionSection(selected string) fyne.CanvasObject {
 	// Provider selection
 	providerLabel := widget.NewLabel("AI Provider:")
 	providerLabel.TextStyle.Bold = true
+
 	providerSelect := widget.NewSelect(
 		[]string{"openai", "claude", "gemini"},
 		func(value string) {
@@ -205,59 +233,71 @@ func (w *MainWindow) createProviderSection() fyne.CanvasObject {
 		},
 	)
 
-	// API Key
+	// Layout with proper spacing
+	content := container.NewVBox(
+		providerLabel,
+		providerSelect,
+	)
+
+	// Set the initial provider selection
+	providerSelect.SetSelected(selected)
+
+	return content
+}
+
+func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
+	// API Key section
 	apiKeyLabel := widget.NewLabel("API Key:")
 	apiKeyLabel.TextStyle.Bold = true
 	apiKeyEntry := widget.NewPasswordEntry()
 	apiKeyEntry.Bind(w.apiKeyBinding)
 	apiKeyEntry.PlaceHolder = "Enter your API key"
 
-	// Model
-	modelLabel := widget.NewLabel("Model (optional):")
+	// Model section
+	modelLabel := widget.NewLabel("Model:")
 	modelLabel.TextStyle.Bold = true
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
-	modelEntry.PlaceHolder = "e.g., gpt-4o"
+	modelEntry.PlaceHolder = "e.g., gpt-4o (optional)"
 
-	// Base URL (for custom endpoints - only for OpenAI)
-	baseURLLabel := widget.NewLabel("Base URL (optional):")
+	// Base URL section (for custom endpoints - only for OpenAI)
+	baseURLLabel := widget.NewLabel("Base URL:")
 	baseURLLabel.TextStyle.Bold = true
 	w.baseURLEntry = widget.NewEntry()
-	// Base URL will be loaded by loadProviderSettings
-	w.baseURLEntry.PlaceHolder = "Default: https://api.openai.com/v1"
+	w.baseURLEntry.PlaceHolder = "https://api.openai.com/v1 (optional)"
 
 	// Create Base URL container for visibility control
 	w.baseURLContainer = container.NewVBox(
-		container.NewPadded(container.NewBorder(nil, nil, baseURLLabel, nil, w.baseURLEntry)),
+		baseURLLabel,
+		w.baseURLEntry,
 	)
 
+	// Configuration form with proper spacing
+	configForm := container.NewVBox(
+		apiKeyLabel,
+		apiKeyEntry,
+		widget.NewSeparator(),
+		modelLabel,
+		modelEntry,
+		widget.NewSeparator(),
+		w.baseURLContainer,
+	)
+
+	return configForm
+}
+
+func (w *MainWindow) createConnectionTestSection() fyne.CanvasObject {
 	// Test connection button
 	testBtn := widget.NewButtonWithIcon("Test Connection", theme.ConfirmIcon(), func() {
 		w.testAPIConnection()
 	})
+	testBtn.Importance = widget.MediumImportance
 
-	form := container.NewVBox(
-		container.NewPadded(providerLabel),
-		container.NewPadded(providerSelect),
-		widget.NewSeparator(),
-		container.NewPadded(apiKeyLabel),
-		container.NewPadded(apiKeyEntry),
-		container.NewPadded(modelLabel),
-		container.NewPadded(modelEntry),
-		w.baseURLContainer,
-		widget.NewSeparator(),
-		container.NewPadded(testBtn),
+	// Layout with proper spacing
+	return container.NewVBox(
+		widget.NewLabel("Test your settings:"),
+		testBtn,
 	)
-
-	// Now set the initial provider selection (after container is created)
-	providerSelect.SetSelected(selected)
-
-	// Set initial visibility based on provider
-	if selected != "openai" {
-		w.baseURLContainer.Hide()
-	}
-
-	return container.NewScroll(form)
 }
 
 func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
@@ -267,6 +307,8 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectAllCapture := NewHotkeyCapture(w.hotkeySelectBinding, "Click 'Capture' to set hotkey")
 	selectAllCapture.window = w.Window // Set window reference for focus
 	// Connect callbacks to disable/enable global hotkeys during capture
+	// Global hotkey library requires at least one non-modifier key on all platforms
+	selectAllCapture.SetAllowModifierOnly(true)
 	selectAllCapture.onCaptureStart = func() {
 		if w.hotkeyManager != nil {
 			w.hotkeyManager.Disable()
@@ -283,6 +325,9 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectionLabel.TextStyle.Bold = true
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 	selectionCapture.window = w.Window // Set window reference for focus
+	// Require at least one non-modifier key; modifier-only (e.g., Ctrl+Win) is not supported by OS/global hotkey APIs
+	selectionCapture.SetAllowModifierOnly(true)
+
 	// Connect callbacks to disable/enable global hotkeys during capture
 	selectionCapture.onCaptureStart = func() {
 		if w.hotkeyManager != nil {
@@ -348,6 +393,7 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	// System Prompt
 	promptLabel := widget.NewLabel("System Prompt:")
+	promptLabel.TextStyle.Bold = true
 	promptEntry := widget.NewMultiLineEntry()
 	promptEntry.Bind(w.promptBinding)
 	promptEntry.SetMinRowsVisible(5)

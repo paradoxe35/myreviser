@@ -1,8 +1,6 @@
 # MyReviser - Project Implementation Plan
 
-> **🚀 Latest Update (Oct 2025)**: Successfully migrated system input layer to **Rust FFI** for better cross-platform compatibility and reliability. Old Go libraries (golang.design/x/hotkey, golang.design/x/clipboard, github.com/go-vgo/robotgo) replaced with production-ready Rust alternatives (rdev, arboard, enigo).
-
-> Important note (current FFI implementation): This repository now uses Rust FFI for global hotkeys (rdev), clipboard (arboard), and key simulation (enigo). Sections later in this document that show golang.design/x/hotkey, golang-design/clipboard, robotgo, or Fyne per-window shortcuts are legacy examples kept for historical reference and should not be used for new work. The authoritative path is: Settings UI hotkey capture → config → FFI hotkey registration → Rust callback → Go processor → FFI clipboard/simulator.
+> **🚀 Latest Update (Oct 2025)**: Successfully migrated system input layer to **Rust FFI** for better cross-platform compatibility and reliability. All system interactions (global hotkeys, clipboard, key simulation) are now handled via Rust FFI (rdev, arboard, enigo).
 
 
 ## Project Overview
@@ -25,9 +23,9 @@ MyReviser is a cross-platform text revision tool built with **Go + Fyne UI + Rus
 - **GUI Framework**: Fyne (v2.6.3+) - Cross-platform Go UI framework
 - **System Tray**: Native Fyne systray support via `desktop.App` interface
 - **System Input (via Rust FFI)**:
-  - **Global Hotkeys**: Rust `rdev 0.5` via FFI (replaces golang.design/x/hotkey)
-  - **Clipboard**: Rust `arboard 3.6` via FFI (replaces golang.design/x/clipboard)
-  - **Key Simulation**: Rust `enigo 0.2` via FFI (replaces github.com/go-vgo/robotgo)
+  - **Global Hotkeys**: Rust `rdev 0.5` via FFI
+  - **Clipboard**: Rust `arboard 3.6` via FFI
+  - **Key Simulation**: Rust `enigo 0.2` via FFI
   - **FFI Binding**: `cbindgen` for automatic C header generation
   - **Build**: Static Rust libraries (`.a`) linked into Go binary via CGO
 - **HTTP Client**: Go standard `net/http` with context support
@@ -38,7 +36,7 @@ MyReviser is a cross-platform text revision tool built with **Go + Fyne UI + Rus
 ### Rust FFI Architecture
 
 **Why Rust FFI?**
-The original Go libraries (golang.design/x/hotkey, golang.design/x/clipboard, github.com/go-vgo/robotgo) had cross-platform compatibility issues and reliability problems. We replaced them with battle-tested Rust libraries via FFI for:
+We use battle-tested Rust libraries via FFI for:
 - Better cross-platform support
 - More reliable system integration
 - Higher performance
@@ -134,8 +132,7 @@ require (
     fyne.io/fyne/v2 v2.6.3
     github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
 )
-// Note: Old libraries removed (golang.design/x/hotkey, golang.design/x/clipboard,
-// github.com/go-vgo/robotgo) - replaced with Rust FFI
+// Note: All system input operations use Rust FFI (no external Go dependencies)
 ```
 
 **Rust Dependencies (rust-ffi/Cargo.toml):**
@@ -332,22 +329,21 @@ type ProviderFactory struct {
 }
 ```
 
-#### 4. Hotkey Manager
+#### 4. FFI Hotkey Manager
 ```go
-// internal/input/hotkeys.go
-type HotkeyManager struct {
-    selectAllBinding string // e.g., "ctrl+alt+space"
-    selectionBinding string // e.g., "ctrl+cmd" for macOS
-    hotkeys         map[string]*hotkey.Hotkey
-    active          bool
-    handlers        map[string]func()
+// internal/input/ffi_hotkeys.go
+type FFIHotkeyManager struct {
+    mu          sync.RWMutex
+    handle      C.HotkeyManagerHandle  // Opaque Rust handle
+    handlers    map[string]func()
+    active      bool
+    lastTrigger map[string]time.Time   // Debounce protection
 }
 
-func (h *HotkeyManager) Start() {
-    // Initialize on main thread (required by golang.design/x/hotkey)
-    mainthread.Init(func() {
-        h.registerHotkeys()
-    })
+func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()) error {
+    // Register via Rust FFI (supports modifier-only bindings)
+    result := C.myreviser_hotkey_register(h.handle, cBinding, cAction, callback)
+    // ...
 }
 ```
 
@@ -837,140 +833,115 @@ func NewMainWindow(app fyne.App) *MainWindow {
 }
 ```
 
-### Clipboard Operations with Fyne
+### FFI Clipboard Operations
 ```go
-// internal/input/clipboard.go
+// internal/input/ffi_clipboard.go
 package input
 
-import (
-    "fyne.io/fyne/v2"
-    "github.com/golang-design/clipboard" // For extended features
-)
-
-type ClipboardManager struct {
-    fyneClip fyne.Clipboard
+type FFIClipboardManager struct {
+    handle C.ClipboardHandle  // Opaque Rust handle
 }
 
-func NewClipboardManager(app fyne.App) *ClipboardManager {
-    // Initialize extended clipboard for image support
-    clipboard.Init()
-
-    return &ClipboardManager{
-        fyneClip: app.Clipboard(),
+func NewFFIClipboardManager() (*FFIClipboardManager, error) {
+    handle := C.myreviser_clipboard_new()
+    if handle == nil {
+        return nil, fmt.Errorf("failed to create clipboard manager")
     }
+    return &FFIClipboardManager{handle: handle}, nil
 }
 
-func (c *ClipboardManager) GetText() string {
-    // Use Fyne's clipboard for simple text
-    return c.fyneClip.Content()
-}
-
-func (c *ClipboardManager) SetText(text string) {
-    c.fyneClip.SetContent(text)
-}
-
-func (c *ClipboardManager) SaveAndRestore(operation func()) {
-    // Save current clipboard
-    saved := c.GetText()
-
-    // Perform operation
-    operation()
-
-    // Restore clipboard
-    c.SetText(saved)
-}
-```
-
-### Hotkey Implementation with golang.design/x/hotkey
-```go
-// internal/input/hotkeys.go
-package input
-
-import (
-    "golang.design/x/hotkey"
-    "golang.design/x/hotkey/mainthread"
-    "github.com/golang-design/clipboard"
-    "github.com/go-vgo/robotgo"
-)
-
-type HotkeyManager struct {
-    handlers map[string]func()
-    hotkeys  map[string]*hotkey.Hotkey
-    stopChan chan struct{}
-}
-
-func NewHotkeyManager() *HotkeyManager {
-    // Initialize clipboard
-    clipboard.Init()
-
-    return &HotkeyManager{
-        handlers: make(map[string]func()),
-        hotkeys:  make(map[string]*hotkey.Hotkey),
-        stopChan: make(chan struct{}),
+func (c *FFIClipboardManager) GetText() (string, error) {
+    cText := C.myreviser_clipboard_get_text(c.handle)
+    if cText == nil {
+        return "", fmt.Errorf("failed to get clipboard text")
     }
+    defer C.myreviser_free_string(cText)
+    return C.GoString(cText), nil
 }
 
-func (h *HotkeyManager) RegisterHotkey(binding string, action string, handler func()) error {
-    // Parse hotkey binding (e.g., "ctrl+alt+space")
-    modifiers, key, err := parseHotkeyBinding(binding)
-    if err != nil {
-        return err
+func (c *FFIClipboardManager) SetText(text string) error {
+    cText := C.CString(text)
+    defer C.free(unsafe.Pointer(cText))
+
+    result := C.myreviser_clipboard_set_text(c.handle, cText)
+    if result != 0 {
+        return fmt.Errorf("failed to set clipboard text")
     }
-
-    // Create hotkey
-    hk := hotkey.New(modifiers, key)
-
-    // Register system-wide hotkey
-    if err := hk.Register(); err != nil {
-        return err
-    }
-
-    h.hotkeys[action] = hk
-    h.handlers[action] = handler
-
     return nil
 }
 
-func (h *HotkeyManager) Start() {
-    // Must run on main thread
-    mainthread.Init(func() {
-        h.listenForHotkeys()
-    })
+func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
+    // Save clipboard, simulate Ctrl+C, get text
+    // Caller must restore clipboard after paste
+    if err := c.SaveCurrent(); err != nil {
+        return "", err
+    }
+
+    sim, _ := NewFFIKeySimulator()
+    defer sim.Close()
+
+    sim.Copy()
+    time.Sleep(100 * time.Millisecond)
+
+    return c.GetText()
+}
+```
+
+### FFI Hotkey Implementation
+```go
+// internal/input/ffi_hotkeys.go
+package input
+
+type FFIHotkeyManager struct {
+    mu          sync.RWMutex
+    handle      C.HotkeyManagerHandle
+    handlers    map[string]func()
+    active      bool
+    lastTrigger map[string]time.Time  // Debounce protection
 }
 
-func (h *HotkeyManager) listenForHotkeys() {
-    for action, hk := range h.hotkeys {
-        go func(action string, hk *hotkey.Hotkey) {
-            for {
-                select {
-                case <-h.stopChan:
-                    return
-                case <-hk.Keydown():
-                    if handler, ok := h.handlers[action]; ok {
-                        handler()
-                    }
-                }
-            }
-        }(action, hk)
+func NewFFIHotkeyManager() *FFIHotkeyManager {
+    handle := C.myreviser_hotkey_manager_new()
+    if handle == nil {
+        return nil
+    }
+
+    return &FFIHotkeyManager{
+        handle:      handle,
+        handlers:    make(map[string]func()),
+        lastTrigger: make(map[string]time.Time),
     }
 }
 
-// Helper function for text capture
-func CaptureSelectedText() (string, error) {
-    // Save current clipboard
-    oldClip := clipboard.Read(clipboard.FmtText)
+func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()) error {
+    h.mu.Lock()
+    h.handlers[action] = handler
+    h.mu.Unlock()
 
-    // Copy selected text
-    robotgo.KeyTap("c", "ctrl") // or "cmd" for macOS
-    robotgo.MilliSleep(100)
+    cBinding := C.CString(binding)
+    cAction := C.CString(action)
+    defer C.free(unsafe.Pointer(cBinding))
+    defer C.free(unsafe.Pointer(cAction))
 
-    // Read new clipboard
-    newClip := clipboard.Read(clipboard.FmtText)
+    // Register with Rust FFI (supports modifier-only bindings like "ctrl+win")
+    result := C.myreviser_hotkey_register(h.handle, cBinding, cAction,
+                                         C.HotkeyCallback(C.hotkeyCallbackGateway))
+    if result != 0 {
+        return fmt.Errorf("failed to register hotkey: %s", binding)
+    }
+    return nil
+}
 
-    // Restore old clipboard
-    clipboard.Write(clipboard.FmtText, oldClip)
+// Callback from Rust when hotkey is triggered
+//export hotkeyCallbackGateway
+func hotkeyCallbackGateway(action *C.char) {
+    defer C.myreviser_free_string(action)
+    actionStr := C.GoString(action)
 
-    return string(newClip), nil
+    // Debounce and execute handler in goroutine
+    if handler, exists := manager.handlers[actionStr]; exists {
+        go handler()
+    }
 }
 ```
 
@@ -1383,48 +1354,34 @@ jobs:
 
 ```
 
-### Dependencies Note for Fyne and golang.design/x/hotkey
+### Build Dependencies
 
-#### Fyne Build Requirements
-Fyne requires CGO for native GUI rendering:
+#### Fyne + Rust FFI Requirements
+Both Fyne GUI and Rust FFI require CGO:
 
 **Linux:**
 ```bash
-# Ubuntu/Debian
+# Ubuntu/Debian - Fyne + X11 + Rust FFI dependencies
 sudo apt-get install -y \
     libgl1-mesa-dev xorg-dev \
-    libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev \
-    libxxf86vm-dev libxkbcommon-dev libxkbcommon-x11-dev
+    libx11-dev libxkbfile-dev libxtst-dev \
+    libxdo-dev libxi-dev \
+    libpng-dev libjpeg-dev \
+    libxinerama-dev libxcb-xkb-dev \
+    libxcursor-dev libxrandr-dev libxrender-dev \
+    libxfixes-dev libxxf86vm-dev \
+    libxkbcommon-dev libxkbcommon-x11-dev
 ```
 
 **Windows:**
-- MinGW-w64 (for CGO compilation)
-- Or Visual Studio C++ build tools
+- MinGW-w64 or MSVC build tools (for CGO)
+- Rust toolchain with `x86_64-pc-windows-gnu` target
+- No additional permissions required
 
 **macOS:**
 - Xcode Command Line Tools
-- No additional dependencies needed
-
-#### golang.design/x/hotkey Global Hotkey Requirements
-
-**Linux:**
-```bash
-# Additional X11 libraries for system-wide hotkeys
-sudo apt-get install -y \
-    libx11-dev libxtst-dev libxkbfile-dev \
-    libxinerama-dev libxrandr-dev libxrender-dev \
-    libxfixes-dev libxi-dev
-```
-
-**Windows:**
-- Requires CGO enabled
-- MinGW-w64 or MSYS2 for CGO compilation
-- Hotkeys work system-wide without additional permissions
-
-**macOS:**
-- Requires CGO enabled
-- Requires Accessibility permissions in System Preferences
-- Must request permission on first run for global hotkey access
+- Rust toolchain
+- Requires Accessibility permissions in System Preferences for global hotkeys
 
 ### Release Process
 1. **Version Tagging**:
@@ -1619,41 +1576,37 @@ This feature provides:
 
 ## Technical Implementation Details
 
-### Clipboard Operations Example
+### FFI Clipboard Operations Example
 ```go
-// Using golang-design/clipboard
-import "github.com/golang-design/clipboard"
-
-func init() {
-    // Initialize on startup
-    err := clipboard.Init()
-    if err != nil {
-        log.Fatal(err)
-    }
-}
+// Using Rust FFI via arboard
+import "C"
 
 func captureAndReplace() {
+    clipMgr, _ := input.NewFFIClipboardManager()
+    defer clipMgr.Close()
+
     // Save current clipboard
-    oldContent := clipboard.Read(clipboard.FmtText)
+    clipMgr.SaveCurrent()
 
     // Simulate Ctrl+C to copy selection
-    robotgo.KeyTap("c", "ctrl")
+    sim, _ := input.NewFFIKeySimulator()
+    defer sim.Close()
+    sim.Copy()
     time.Sleep(100 * time.Millisecond)
 
     // Get selected text
-    selectedText := string(clipboard.Read(clipboard.FmtText))
+    selectedText, _ := clipMgr.GetText()
 
     // Process text with AI
     revisedText := processWithAI(selectedText)
 
-    // Write revised text
-    clipboard.Write(clipboard.FmtText, []byte(revisedText))
-
-    // Simulate Ctrl+V to paste
-    robotgo.KeyTap("v", "ctrl")
+    // Write revised text and paste
+    clipMgr.SetText(revisedText)
+    sim.Paste()
+    time.Sleep(300 * time.Millisecond)
 
     // Restore original clipboard
-    clipboard.Write(clipboard.FmtText, oldContent)
+    clipMgr.Restore()
 }
 ```
 
@@ -1867,7 +1820,7 @@ fyne package -os linux -icon assets/icon.png
 - [x] Replace Character Limit text entry with number input field (default: 1000)
 - [x] Add consistent spacing between all form fields and sections
 - [x] Implement custom hotkey capture widget with real-time key detection using Fyne's native events
-- [x] **Switch from gohook to golang.design/x/hotkey** for system-wide global hotkeys (more reliable)
+- [x] **Implemented Rust FFI** for system-wide global hotkeys (rdev), clipboard (arboard), and key simulation (enigo)
 - [x] Implement multi-provider configuration storage (map-based per-provider settings)
 - [x] Add automatic provider reinitialization on config changes
 - [x] Update Makefile: Add CGO_ENABLED=1, output to `./bin/` folder
@@ -1922,7 +1875,7 @@ Key mapping includes:
 - Special keys (Space, Enter, Tab, Backspace, Delete)
 - Arrow keys (Up, Down, Left, Right)
 
-**Note:** Uses Fyne's built-in keyboard event system for UI capture. System-wide hotkey listening is handled separately by `golang.design/x/hotkey` in `internal/input/hotkeys.go`.
+**Note:** Uses Fyne's built-in keyboard event system for UI capture. System-wide hotkey listening is handled via Rust FFI (rdev) in `internal/input/ffi_hotkeys.go`.
 
 #### 5. Build Optimization
 Current binary size: ~42 MB
@@ -1986,9 +1939,10 @@ providerSelect.OnChanged = func(value string) {
 - [x] Rust FFI library with cbindgen bindings
 - [x] Static library compilation for all platforms
 - [x] FFI wrappers in Go (CGO)
-- [x] Global hotkeys via rdev (replaces golang.design/x/hotkey)
-- [x] Clipboard operations via arboard (replaces golang.design/x/clipboard)
-- [x] Key simulation via enigo (replaces github.com/go-vgo/robotgo)
+- [x] Global hotkeys via Rust rdev
+- [x] Clipboard operations via Rust arboard
+- [x] Key simulation via Rust enigo
+- [x] Modifier-only hotkey support (e.g., `ctrl+win`)
 - [x] Memory leak analysis and fixes
 - [x] Callback CString lifetime fix
 - [x] Comprehensive FFI safety documentation

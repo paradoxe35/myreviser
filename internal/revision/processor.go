@@ -240,7 +240,9 @@ func (p *Processor) reviseText(text string) (string, error) {
 
 	logger.Info("Sending text to AI provider",
 		"provider", provider.GetName(),
-		"text_length", len(text))
+		"text", text,
+		"text_length", len(text),
+	)
 
 	// Revise text with latest system prompt
 	revised, err := provider.ReviseText(ctx, text, p.config.Revision.SystemPrompt)
@@ -249,8 +251,10 @@ func (p *Processor) reviseText(text string) (string, error) {
 	}
 
 	logger.Info("Text revised successfully",
+		"revised", revised,
 		"original_length", len(text),
-		"revised_length", len(revised))
+		"revised_length", len(revised),
+	)
 
 	return revised, nil
 }
