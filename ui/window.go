@@ -48,6 +48,10 @@ type MainWindow struct {
 	// UI containers for dynamic visibility
 	baseURLContainer *fyne.Container
 	baseURLEntry     *widget.Entry
+
+	// Platform-specific callbacks
+	onShowCallback func()
+	onHideCallback func()
 }
 
 func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHotkeyManager) *MainWindow {
@@ -639,6 +643,31 @@ func (w *MainWindow) saveSettings() {
 
 func (w *MainWindow) ShowAndRun() {
 	w.Window.ShowAndRun()
+}
+
+// ShowWindow shows the window and handles platform-specific behavior (e.g., macOS Dock)
+func (w *MainWindow) ShowWindow() {
+	// Call the platform-specific show handler if set
+	if w.onShowCallback != nil {
+		w.onShowCallback()
+	}
+	w.Show()
+	w.RequestFocus()
+}
+
+// HideWindow hides the window and handles platform-specific behavior (e.g., macOS Dock)
+func (w *MainWindow) HideWindow() {
+	w.Hide()
+	// Call the platform-specific hide handler if set
+	if w.onHideCallback != nil {
+		w.onHideCallback()
+	}
+}
+
+// SetShowHideCallbacks sets the callbacks for platform-specific show/hide behavior
+func (w *MainWindow) SetShowHideCallbacks(onShow func(), onHide func()) {
+	w.onShowCallback = onShow
+	w.onHideCallback = onHide
 }
 
 // Custom theme types to force light or dark theme

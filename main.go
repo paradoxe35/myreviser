@@ -60,11 +60,6 @@ func main() {
 	myApp := app.NewWithID("me.pngwasi.myreviser")
 	myApp.Settings().SetTheme(&ui.MyReviserTheme{})
 
-	// Set macOS activation policy (hide from Dock when no windows visible)
-	myApp.Lifecycle().SetOnStarted(func() {
-		setActivationPolicy()
-	})
-
 	logger.Info("MyReviser starting", "version", Version, "build_time", BuildTime)
 
 	// Create and start the application

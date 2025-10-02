@@ -11,13 +11,11 @@ func SetupSystemTray(desk desktop.App, mainWindow *MainWindow, onQuit func() err
 	// Set system tray menu
 	menu := fyne.NewMenu("MyReviser",
 		fyne.NewMenuItem("Show", func() {
-			mainWindow.Show()
-			mainWindow.RequestFocus()
+			mainWindow.ShowWindow()
 		}),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Settings", func() {
-			mainWindow.Show()
-			mainWindow.RequestFocus()
+			mainWindow.ShowWindow()
 		}),
 		fyne.NewMenuItem("View Logs", func() {
 			if err := logger.OpenLogFile(); err != nil {

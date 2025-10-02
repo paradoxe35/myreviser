@@ -63,6 +63,9 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 		application.reloadHotkeysFromConfig()
 	})
 
+	// Set platform-specific show/hide callbacks (for macOS Dock behavior)
+	mainWindow.SetShowHideCallbacks(showInDock, hideFromDock)
+
 	// Setup system tray if available
 	if desk, ok := app.(desktop.App); ok {
 		ui.SetupSystemTray(desk, mainWindow, func() error {
@@ -73,7 +76,7 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 
 	// Setup window close intercept
 	mainWindow.SetCloseIntercept(func() {
-		mainWindow.Hide()
+		mainWindow.HideWindow() // Use HideWindow to trigger callbacks
 	})
 
 	return application, nil
@@ -166,15 +169,18 @@ func (a *Application) Start() error {
 
 	// Show window if first run, or if not set to start minimized
 	if a.config.Meta.FirstRun || !a.config.Appearance.StartMinimized {
-		a.mainWindow.Show()
-		a.mainWindow.RequestFocus()
+		a.mainWindow.ShowWindow() // Shows window and Dock icon
 		// Mark first run complete and persist
 		if a.config.Meta.FirstRun {
 			a.config.Meta.FirstRun = false
 			if err := a.config.Save(); err != nil {
 				logger.Error("Failed to persist first-run flag", "error", err)
 			}
+			logger.Info("First run complete, window shown")
 		}
+	} else {
+		hideFromDock() // Hide from Dock when starting minimized
+		logger.Info("Starting minimized to tray")
 	}
 
 	// Run the application
