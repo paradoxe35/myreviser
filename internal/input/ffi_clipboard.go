@@ -14,7 +14,7 @@ package input
 
 // Windows static linking
 #cgo windows LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
-#cgo windows LDFLAGS: -lws2_32 -luserenv -lbcrypt -static
+#cgo windows LDFLAGS: -lws2_32 -luserenv -lbcrypt -lntdll -static
 
 #include <stdlib.h>
 #include "bindings.h"

@@ -103,19 +103,13 @@ jobs:
           mkdir -p lib
           cp rust-ffi/target/release/libmyreviser_ffi.a lib/
 
-      - name: Bundle resources
-        run: |
-          if [ -f assets/icon.png ]; then
-            fyne bundle -o bundled.go assets/icon.png
-          fi
-
       - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -o myreviser-linux-${{ matrix.arch }}
+          fyne build -release -icon assets/icon.png -o myreviser-linux-${{ matrix.arch }}
 
       - name: Create portable archive
         run: |
@@ -303,19 +297,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path lib
           Copy-Item rust-ffi\target\x86_64-pc-windows-gnu\release\libmyreviser_ffi.a lib\
 
-      - name: Bundle resources
-        run: |
-          if (Test-Path "assets/icon.png") {
-            fyne bundle -o bundled.go assets/icon.png
-          }
-
       - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -o myreviser-windows-${{ matrix.arch }}.exe
+          fyne build -release -icon assets/icon.ico -o myreviser-windows-${{ matrix.arch }}.exe
 
       - name: Create portable ZIP
         run: |
@@ -480,20 +468,14 @@ jobs:
             cp target/x86_64-apple-darwin/release/libmyreviser_ffi.a ../lib/
           fi
 
-      - name: Bundle resources
-        run: |
-          if [ -f assets/icon.png ]; then
-            fyne bundle -o bundled.go assets/icon.png
-          fi
-
       - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
         run: |
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            fyne package --target darwin/arm64 --name MyReviser --app-id me.pngwasi.myreviser --release
+            fyne package --target darwin/arm64 --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
           else
-            fyne package --target darwin/amd64 --name MyReviser --app-id me.pngwasi.myreviser --release
+            fyne package --target darwin/amd64 --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
           fi
 
       - name: Verify .app bundle created
