@@ -62,6 +62,12 @@ func main() {
 
 	logger.Info("MyReviser starting", "version", Version, "build_time", BuildTime)
 
+	// Check accessibility permissions (macOS only)
+	if !checkAccessibilityPermissions() {
+		logger.Warn("MyReviser requires accessibility permissions to function properly")
+		logger.Warn("The system prompt has been shown. Please grant permissions and restart the app.")
+	}
+
 	// Create and start the application
 	application, err := NewApplication(myApp, cfg)
 	if err != nil {
