@@ -282,6 +282,9 @@ jobs:
         run: |
           choco install mingw -y
 
+      - name: Add Rust GNU target
+        run: rustup target add x86_64-pc-windows-gnu
+
       - name: Install Fyne CLI
         run: go install fyne.io/tools/cmd/fyne@latest
 
@@ -291,11 +294,10 @@ jobs:
       - name: Build Rust FFI library
         run: |
           cd rust-ffi
-          cargo build --release
+          cargo build --release --target x86_64-pc-windows-gnu
           cd ..
           New-Item -ItemType Directory -Force -Path lib
-          Copy-Item rust-ffi\target\release\myreviser_ffi.lib lib\ -ErrorAction SilentlyContinue
-          Copy-Item rust-ffi\target\release\libmyreviser_ffi.a lib\ -ErrorAction SilentlyContinue
+          Copy-Item rust-ffi\target\x86_64-pc-windows-gnu\release\libmyreviser_ffi.a lib\
 
       - name: Bundle resources
         run: |
