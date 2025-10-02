@@ -14,7 +14,7 @@ crate-type = ["staticlib"]  # Static library for Go CGO
 # Core dependencies for system input
 rdev = "0.5"          # Global hotkeys and input monitoring
 arboard = "3.6"       # Clipboard management
-enigo = "0.2"         # Keyboard/mouse simulation
+enigo = "0.6"         # Keyboard/mouse simulation
 
 # Async runtime
 tokio = { version = "1.41", features = ["rt", "sync", "time"] }
@@ -33,9 +33,10 @@ parking_lot = "0.12"
 
 # FFI-specific
 libc = "0.2"
+cbindgen = "0.29"
 
 [build-dependencies]
-cbindgen = "0.28"
+cbindgen = "0.29"
 
 [profile.release]
 opt-level = "z"        # Optimize for size

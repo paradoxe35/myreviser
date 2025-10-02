@@ -16,6 +16,11 @@ bool CheckAccessibilityPermissions(void) {
     return trusted;
 }
 
+// Dummy callback for permission check
+static CGEventRef DummyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
+    return event;
+}
+
 // Check if Input Monitoring permissions are granted
 // Returns true if the app can listen to keyboard events
 bool CheckInputMonitoringPermissions(void) {
@@ -26,7 +31,7 @@ bool CheckInputMonitoringPermissions(void) {
         kCGHeadInsertEventTap,
         kCGEventTapOptionListenOnly,
         CGEventMaskBit(kCGEventKeyDown),
-        NULL,
+        DummyEventCallback,
         NULL
     );
 

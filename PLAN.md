@@ -677,7 +677,7 @@ func GetPlatformHotkeys() HotkeyConfig {
 #### Development
 ```bash
 # Install Fyne command tools
-go install fyne.io/fyne/v2/cmd/fyne@latest
+go install go install fyne.io/tools/cmd/fyne@latest
 
 # Run in development mode
 go run .
@@ -954,7 +954,7 @@ The project includes a comprehensive GitHub Actions workflow for automated multi
 
 #### Key Implementation Details:
 - Pure Go implementation with native UI widgets
-- Uses Fyne CLI (`fyne.io/fyne/v2/cmd/fyne@latest`) for building and packaging
+- Uses Fyne CLI (`go install fyne.io/tools/cmd/fyne@latest`) for building and packaging
 - Requires OpenGL and X11 dependencies for Linux
 - Uses `fyne bundle` for resource embedding
 - Uses `fyne package` for platform-specific packaging
@@ -1036,7 +1036,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -1410,13 +1410,13 @@ cd myreviser-go/fyne
 go mod download
 
 # Install Fyne tool
-go install fyne.io/fyne/v2/cmd/fyne@latest
+go install go install fyne.io/tools/cmd/fyne@latest
 
 # Run application
 go run .
 
 # Or with hot reload (install air first)
-go install github.com/cosmtrek/air@latest
+go install github.com/air-verse/air@latest
 air
 ```
 

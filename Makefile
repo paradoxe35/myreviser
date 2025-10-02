@@ -1,32 +1,61 @@
-# Makefile for MyReviser with Rust FFI Static Linking
-.PHONY: build run clean test install-deps help
-.PHONY: build-rust build-rust-linux build-rust-darwin build-rust-windows
-.PHONY: build-go package-all lint fmt update-deps
+# =============================================================================
+# Makefile for MyReviser - AI-Powered Text Revision Tool
+# =============================================================================
+#
+# MyReviser is built with Go (Fyne UI) + Rust FFI (rdev, arboard, enigo)
+# This Makefile handles cross-platform builds with static linking.
+#
+# Quick Start:
+#   make dev          - Development mode with hot reload
+#   make build        - Build for current platform
+#   make help         - Show all available commands
+#
+# =============================================================================
+
+.PHONY: build run clean test install-deps help examples
+.PHONY: build-rust build-rust-linux build-rust-darwin build-rust-darwin-amd64 build-rust-darwin-arm64 build-rust-windows
+.PHONY: build-go package-all lint fmt update-deps dev dev-quick
+.PHONY: clean-rust clean-go ci-setup ci-build ci-test ci-package verify-static
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S')
 LDFLAGS := -s -w -X 'main.Version=$(VERSION)' -X 'main.BuildTime=$(BUILD_TIME)'
 
-# Detect current OS
+# Detect current OS and architecture
 UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
 ifeq ($(UNAME_S),Linux)
     CURRENT_OS := linux
+    CURRENT_ARCH := amd64
     RUST_TARGET := x86_64-unknown-linux-musl
     LIB_EXT := a
     BIN_EXT :=
     CC := musl-gcc
     EXTRA_LDFLAGS := -linkmode external -extldflags '-static'
 endif
+
 ifeq ($(UNAME_S),Darwin)
     CURRENT_OS := darwin
-    RUST_TARGET := x86_64-apple-darwin
+    # Detect macOS architecture
+    ifeq ($(UNAME_M),arm64)
+        CURRENT_ARCH := arm64
+        RUST_TARGET := aarch64-apple-darwin
+        GO_ARCH := arm64
+    else
+        CURRENT_ARCH := amd64
+        RUST_TARGET := x86_64-apple-darwin
+        GO_ARCH := amd64
+    endif
     LIB_EXT := a
     BIN_EXT :=
     CC := clang
     EXTRA_LDFLAGS :=
 endif
+
 ifeq ($(OS),Windows_NT)
     CURRENT_OS := windows
+    CURRENT_ARCH := amd64
     RUST_TARGET := x86_64-pc-windows-gnu
     LIB_EXT := a
     BIN_EXT := .exe
@@ -48,28 +77,60 @@ all: build
 # Help
 # ============================================================================
 help:
-	@echo "MyReviser Makefile - Rust FFI Static Build"
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo "MyReviser Makefile - Rust FFI + Go Static Build"
+	@echo "════════════════════════════════════════════════════════════════════════════"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  make build                - Build Rust FFI + Go app for current platform"
-	@echo "  make build-rust           - Build Rust FFI static library for current platform"
-	@echo "  make build-rust-linux     - Build Rust FFI for Linux (musl static)"
-	@echo "  make build-rust-darwin    - Build Rust FFI for macOS"
-	@echo "  make build-rust-windows   - Build Rust FFI for Windows (MinGW)"
-	@echo "  make build-go             - Build Go application (requires Rust library)"
-	@echo "  make run                  - Build and run in development mode"
-	@echo "  make clean                - Clean all build artifacts"
-	@echo "  make test                 - Run all tests (Rust + Go)"
-	@echo "  make test-rust            - Run Rust tests only"
-	@echo "  make test-go              - Run Go tests only"
-	@echo "  make package-all          - Package for all platforms"
-	@echo "  make install-deps         - Install build dependencies"
-	@echo "  make lint                 - Run linters"
-	@echo "  make fmt                  - Format code"
-	@echo "  make verify-static        - Verify binary is statically linked"
+	@echo "📦 Current Environment:"
+	@echo "   Platform:      $(CURRENT_OS)-$(CURRENT_ARCH)"
+	@echo "   Rust Target:   $(RUST_TARGET)"
+	@echo "   Version:       $(VERSION)"
 	@echo ""
-	@echo "Current platform: $(CURRENT_OS)"
-	@echo "Rust target: $(RUST_TARGET)"
+	@echo "🚀 Common Commands:"
+	@echo "   make dev                  - Run in development mode with hot reload"
+	@echo "   make dev-quick            - Run in development mode (no hot reload)"
+	@echo "   make build                - Build Rust FFI + Go app for current platform"
+	@echo "   make run                  - Build and run application"
+	@echo "   make clean                - Clean all build artifacts"
+	@echo ""
+	@echo "🔧 Build Commands:"
+	@echo "   make build-rust           - Build Rust FFI static library (current arch)"
+	@echo "   make build-rust-linux     - Build Rust FFI for Linux (musl static)"
+	@echo "   make build-rust-darwin    - Build Rust FFI for macOS (auto-detect arch)"
+	@echo "   make build-rust-darwin-amd64 - Build Rust FFI for macOS Intel"
+	@echo "   make build-rust-darwin-arm64 - Build Rust FFI for macOS Apple Silicon"
+	@echo "   make build-rust-windows   - Build Rust FFI for Windows (MinGW)"
+	@echo "   make build-go             - Build Go application (requires Rust library)"
+	@echo "   make package-all          - Build packages for all platforms"
+	@echo ""
+	@echo "🧹 Clean Commands:"
+	@echo "   make clean                - Clean all build artifacts"
+	@echo "   make clean-rust           - Clean Rust artifacts only"
+	@echo "   make clean-go             - Clean Go artifacts only"
+	@echo ""
+	@echo "🧪 Testing & Quality:"
+	@echo "   make test                 - Run all tests (Rust + Go)"
+	@echo "   make test-rust            - Run Rust tests only"
+	@echo "   make test-go              - Run Go tests only"
+	@echo "   make lint                 - Run linters (Rust clippy + Go golangci-lint)"
+	@echo "   make fmt                  - Format code (Rust + Go)"
+	@echo "   make verify-static        - Verify binary is statically linked"
+	@echo ""
+	@echo "📚 Utilities:"
+	@echo "   make install-deps         - Install build dependencies"
+	@echo "   make update-deps          - Update all dependencies"
+	@echo "   make install              - Install binary to /usr/local/bin"
+	@echo "   make examples             - Show detailed usage examples"
+	@echo ""
+	@echo "🔄 CI/CD:"
+	@echo "   make ci-setup             - Setup CI environment"
+	@echo "   make ci-build             - CI build"
+	@echo "   make ci-test              - CI test"
+	@echo "   make ci-package           - CI package"
+	@echo ""
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo "💡 Tip: Run 'make examples' for detailed usage examples"
+	@echo "════════════════════════════════════════════════════════════════════════════"
 
 # ============================================================================
 # Install Dependencies
@@ -127,14 +188,35 @@ build-rust-linux:
 	cp $(RUST_FFI_DIR)/target/x86_64-unknown-linux-musl/release/libmyreviser_ffi.a $(LIB_DIR)/
 	@echo "Linux Rust FFI library built!"
 
-# Build for macOS
+# Build for macOS (current architecture)
 build-rust-darwin:
-	@echo "Building Rust FFI static library for macOS..."
+	@echo "Building Rust FFI static library for macOS ($(CURRENT_ARCH))..."
 	@mkdir -p $(LIB_DIR)
 	cd $(RUST_FFI_DIR) && \
+		rustup target add $(RUST_TARGET) && \
+		cargo build --release --target $(RUST_TARGET)
+	cp $(RUST_FFI_DIR)/target/$(RUST_TARGET)/release/libmyreviser_ffi.a $(LIB_DIR)/
+	@echo "macOS Rust FFI library built for $(CURRENT_ARCH)!"
+
+# Build for macOS Intel (x86_64)
+build-rust-darwin-amd64:
+	@echo "Building Rust FFI static library for macOS Intel (x86_64)..."
+	@mkdir -p $(LIB_DIR)
+	cd $(RUST_FFI_DIR) && \
+		rustup target add x86_64-apple-darwin && \
 		cargo build --release --target x86_64-apple-darwin
 	cp $(RUST_FFI_DIR)/target/x86_64-apple-darwin/release/libmyreviser_ffi.a $(LIB_DIR)/
-	@echo "macOS Rust FFI library built!"
+	@echo "macOS Intel Rust FFI library built!"
+
+# Build for macOS Apple Silicon (ARM64)
+build-rust-darwin-arm64:
+	@echo "Building Rust FFI static library for macOS Apple Silicon (ARM64)..."
+	@mkdir -p $(LIB_DIR)
+	cd $(RUST_FFI_DIR) && \
+		rustup target add aarch64-apple-darwin && \
+		cargo build --release --target aarch64-apple-darwin
+	cp $(RUST_FFI_DIR)/target/aarch64-apple-darwin/release/libmyreviser_ffi.a $(LIB_DIR)/
+	@echo "macOS Apple Silicon Rust FFI library built!"
 
 # Build for Windows (MinGW)
 build-rust-windows:
@@ -159,7 +241,7 @@ build-go:
 	}
 	@command -v fyne >/dev/null 2>&1 || { \
 		echo "Installing Fyne CLI..."; \
-		go install fyne.io/fyne/v2/cmd/fyne@latest; \
+		go install go install fyne.io/tools/cmd/fyne@latest; \
 	}
 	CGO_ENABLED=1 \
 	CC=$(CC) \
@@ -203,7 +285,7 @@ package-all: clean
 	@mkdir -p $(BIN_DIR)
 	@command -v fyne >/dev/null 2>&1 || { \
 		echo "Installing Fyne CLI..."; \
-		go install fyne.io/fyne/v2/cmd/fyne@latest; \
+		go install go install fyne.io/tools/cmd/fyne@latest; \
 	}
 
 	@echo ""
@@ -217,13 +299,22 @@ package-all: clean
 			-o $(BIN_DIR)/myreviser-linux-amd64
 
 	@echo ""
-	@echo "=== Building for macOS ==="
-	$(MAKE) build-rust-darwin
+	@echo "=== Building for macOS (Intel) ==="
+	$(MAKE) build-rust-darwin-amd64
 	CGO_ENABLED=1 \
 		GOOS=darwin \
 		GOARCH=amd64 \
-		fyne build -release \
-			-o $(BIN_DIR)/myreviser-darwin-amd64
+		fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
+	mv MyReviser.app $(BIN_DIR)/MyReviser-darwin-amd64.app
+
+	@echo ""
+	@echo "=== Building for macOS (Apple Silicon) ==="
+	$(MAKE) build-rust-darwin-arm64
+	CGO_ENABLED=1 \
+		GOOS=darwin \
+		GOARCH=arm64 \
+		fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
+	mv MyReviser.app $(BIN_DIR)/MyReviser-darwin-arm64.app
 
 	@echo ""
 	@echo "=== Building for Windows ==="
@@ -305,13 +396,27 @@ clean-go:
 # ============================================================================
 # Development
 # ============================================================================
-dev:
-	@echo "Starting development mode with hot reload..."
+dev: build-rust
+	@echo "Starting development mode..."
+	@echo "Building Rust FFI library first (if needed)..."
+	@test -f $(LIB_DIR)/libmyreviser_ffi.a || $(MAKE) build-rust
+	@echo "Running Go application with hot reload..."
 	@command -v air >/dev/null 2>&1 || { \
-		echo "Installing air..."; \
-		go install github.com/cosmtrek/air@latest; \
+		echo "Air not found. Installing air for hot reload..."; \
+		go install github.com/air-verse/air@latest; \
 	}
-	air
+	@if command -v air >/dev/null 2>&1; then \
+		echo "Starting air for hot reload..."; \
+		CGO_ENABLED=1 air; \
+	else \
+		echo "Air installation failed. Running normally with: go run ."; \
+		CGO_ENABLED=1 go run .; \
+	fi
+
+# Quick dev run without hot reload
+dev-quick: build-rust
+	@echo "Running in development mode (no hot reload)..."
+	CGO_ENABLED=1 go run .
 
 # Update dependencies
 update-deps:
@@ -345,3 +450,50 @@ ci-test:
 ci-package:
 	@echo "CI package..."
 	$(MAKE) package-all
+
+# ============================================================================
+# Examples & Documentation
+# ============================================================================
+.PHONY: examples
+examples:
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo "MyReviser - Common Usage Examples"
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "1️⃣  First Time Setup:"
+	@echo "   $$ make install-deps         # Install all dependencies"
+	@echo "   $$ make build                # Build for your platform"
+	@echo "   $$ make run                  # Run the application"
+	@echo ""
+	@echo "2️⃣  Development Workflow:"
+	@echo "   $$ make dev                  # Start with hot reload (recommended)"
+	@echo "   $$ make dev-quick            # Start without hot reload (faster startup)"
+	@echo "   # Edit code, save, and see changes automatically"
+	@echo ""
+	@echo "3️⃣  Building for Release:"
+	@echo "   $$ make clean                # Clean previous builds"
+	@echo "   $$ make build                # Build optimized binary"
+	@echo "   $$ ./bin/myreviser           # Run the binary"
+	@echo ""
+	@echo "4️⃣  Cross-Platform Build (macOS example):"
+	@echo "   # Build for your Mac (auto-detects Intel or Apple Silicon)"
+	@echo "   $$ make build"
+	@echo ""
+	@echo "   # Build specifically for Intel Mac"
+	@echo "   $$ make build-rust-darwin-amd64"
+	@echo "   $$ CGO_ENABLED=1 GOARCH=amd64 fyne package --release"
+	@echo ""
+	@echo "   # Build specifically for Apple Silicon Mac"
+	@echo "   $$ make build-rust-darwin-arm64"
+	@echo "   $$ CGO_ENABLED=1 GOARCH=arm64 fyne package --release"
+	@echo ""
+	@echo "5️⃣  Code Quality:"
+	@echo "   $$ make fmt                  # Format code"
+	@echo "   $$ make lint                 # Run linters"
+	@echo "   $$ make test                 # Run all tests"
+	@echo ""
+	@echo "6️⃣  Deployment:"
+	@echo "   $$ make install              # Install to /usr/local/bin"
+	@echo "   $$ make package-all          # Build for all platforms"
+	@echo ""
+	@echo "════════════════════════════════════════════════════════════════════════════"
