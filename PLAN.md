@@ -2,6 +2,9 @@
 
 > **🚀 Latest Update (Oct 2025)**: Successfully migrated system input layer to **Rust FFI** for better cross-platform compatibility and reliability. Old Go libraries (golang.design/x/hotkey, golang.design/x/clipboard, github.com/go-vgo/robotgo) replaced with production-ready Rust alternatives (rdev, arboard, enigo).
 
+> Important note (current FFI implementation): This repository now uses Rust FFI for global hotkeys (rdev), clipboard (arboard), and key simulation (enigo). Sections later in this document that show golang.design/x/hotkey, golang-design/clipboard, robotgo, or Fyne per-window shortcuts are legacy examples kept for historical reference and should not be used for new work. The authoritative path is: Settings UI hotkey capture → config → FFI hotkey registration → Rust callback → Go processor → FFI clipboard/simulator.
+
+
 ## Project Overview
 MyReviser is a cross-platform text revision tool built with **Go + Fyne UI + Rust FFI** that integrates with AI providers to automatically enhance text quality, fix grammar, and improve clarity while preserving the original intent and language.
 
@@ -538,7 +541,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 ## Security & Permissions
 
 ### Required Permissions
-- **Windows**: 
+- **Windows**:
   - Accessibility API access
   - Run as background service
   - Global hotkey registration
@@ -1166,7 +1169,7 @@ jobs:
 
           # Create tarball
           tar -czf myreviser-linux.tar.gz myreviser assets/icon.png
-          
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -1377,7 +1380,7 @@ jobs:
             - Windows: `%USERPROFILE%\.myreviser\config.json`
             - macOS: `~/.myreviser/config.json`
             - Linux: `~/.myreviser/config.json`
-            
+
 ```
 
 ### Dependencies Note for Fyne and golang.design/x/hotkey
@@ -2039,6 +2042,6 @@ providerSelect.OnChanged = func(value string) {
 
 ---
 
-**Last Updated**: October 2, 2025  
-**Current Version**: v1.0.0 (FFI Implementation Complete)  
+**Last Updated**: October 2, 2025
+**Current Version**: v1.0.0 (FFI Implementation Complete)
 **Status**: Production Ready ✅

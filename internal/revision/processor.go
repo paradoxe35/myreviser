@@ -130,6 +130,8 @@ func (p *Processor) ProcessSelectAll() error {
 	if err := input.FFISimulateCopy(); err != nil {
 		return fmt.Errorf("failed to copy: %w", err)
 	}
+	// Allow clipboard to update before reading
+	time.Sleep(100 * time.Millisecond)
 
 	// Get text from clipboard
 	text, err := p.clipboardManager.GetText()
@@ -144,21 +146,14 @@ func (p *Processor) ProcessSelectAll() error {
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
-	// Replace the text
-	if err := p.clipboardManager.SetText(revisedText); err != nil {
-		p.clipboardManager.Restore()
-		return fmt.Errorf("failed to set revised text: %w", err)
-	}
-
-	// Select all again and paste
+	// Select all again and paste revised text (uses FFI helper with built-in delay)
 	if err := input.FFISimulateSelectAll(); err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to select all for paste: %w", err)
 	}
-
-	if err := input.FFISimulatePaste(); err != nil {
+	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		p.clipboardManager.Restore()
-		return fmt.Errorf("failed to paste: %w", err)
+		return fmt.Errorf("failed to replace text: %w", err)
 	}
 
 	// Restore original clipboard

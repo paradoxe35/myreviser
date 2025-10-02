@@ -27,6 +27,8 @@ import "C"
 import (
 	"fmt"
 	"sync"
+	"time"
+
 	"unsafe"
 
 	"github.com/paradoxe35/myreviser-go/internal/logger"
@@ -34,10 +36,12 @@ import (
 
 // FFIHotkeyManager wraps the Rust FFI hotkey manager
 type FFIHotkeyManager struct {
-	mu       sync.RWMutex
-	handle   C.HotkeyManagerHandle
-	handlers map[string]func()
-	active   bool
+	mu          sync.RWMutex
+	handle      C.HotkeyManagerHandle
+	handlers    map[string]func()
+	active      bool
+	disabled    bool
+	lastTrigger map[string]time.Time
 }
 
 // Global instance for callback routing
@@ -53,8 +57,9 @@ func NewFFIHotkeyManager() *FFIHotkeyManager {
 	}
 
 	manager := &FFIHotkeyManager{
-		handle:   handle,
-		handlers: make(map[string]func()),
+		handle:      handle,
+		handlers:    make(map[string]func()),
+		lastTrigger: make(map[string]time.Time),
 	}
 
 	// Set as global for callback routing
@@ -196,11 +201,17 @@ func (h *FFIHotkeyManager) Close() {
 // Disable and Enable are not supported in FFI version yet
 // They would require additional Rust FFI functions
 func (h *FFIHotkeyManager) Disable() {
-	logger.Warn("FFI: Disable() not yet implemented in FFI version")
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.disabled = true
+	logger.Info("FFI: Hotkeys disabled (Go-level gate)")
 }
 
 func (h *FFIHotkeyManager) Enable() {
-	logger.Warn("FFI: Enable() not yet implemented in FFI version")
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.disabled = false
+	logger.Info("FFI: Hotkeys enabled (Go-level gate)")
 }
 
 // hotkeyCallbackGateway is called from Rust when a hotkey is triggered
@@ -225,9 +236,23 @@ func hotkeyCallbackGateway(action *C.char) {
 	// Copy the string immediately before Rust potentially frees it
 	actionStr := C.GoString(action)
 
-	manager.mu.RLock()
+	// Check disabled state and debounce window atomically
+	manager.mu.Lock()
+	if manager.disabled {
+		manager.mu.Unlock()
+		logger.Debug("FFI: Hotkey ignored (disabled)", "action", actionStr)
+		return
+	}
+	if t, ok := manager.lastTrigger[actionStr]; ok {
+		if time.Since(t) < 500*time.Millisecond {
+			manager.mu.Unlock()
+			logger.Debug("FFI: Hotkey ignored (debounced)", "action", actionStr)
+			return
+		}
+	}
+	manager.lastTrigger[actionStr] = time.Now()
 	handler, exists := manager.handlers[actionStr]
-	manager.mu.RUnlock()
+	manager.mu.Unlock()
 
 	if exists && handler != nil {
 		logger.Info("FFI: Hotkey triggered, executing handler", "action", actionStr)
