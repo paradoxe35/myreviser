@@ -56,22 +56,32 @@ func OpenLogFile() error {
 
 	// Platform-specific command to open file in default editor
 	var cmd *exec.Cmd
+	var openErr error
+
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "", logFile)
+		// Try notepad first (always available on Windows)
+		cmd = exec.Command("notepad.exe", logFile)
+		openErr = cmd.Start()
+		if openErr != nil {
+			// Fallback: Use explorer to open the file with default text editor
+			cmd = exec.Command("explorer.exe", logFile)
+			openErr = cmd.Start()
+		}
 	case "darwin":
 		cmd = exec.Command("open", logFile)
+		openErr = cmd.Start()
 	case "linux":
 		cmd = exec.Command("xdg-open", logFile)
+		openErr = cmd.Start()
 	default:
 		// Fallback: try to open directory
 		return OpenLogDirectory()
 	}
 
-	// Try to open the log file
-	if err := cmd.Start(); err != nil {
-		// If failed, open the logs directory instead
-		Warn("Failed to open log file, opening directory instead", "error", err)
+	// If failed to open file, try opening the logs directory instead
+	if openErr != nil {
+		Warn("Failed to open log file, opening directory instead", "error", openErr)
 		return OpenLogDirectory()
 	}
 
@@ -82,10 +92,18 @@ func OpenLogFile() error {
 func OpenLogDirectory() error {
 	logDir := GetLogDirectory()
 
+	Info("Opening log directory", "directory", logDir)
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory: %w", err)
+	}
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("explorer", logDir)
+		// On Windows, use explorer.exe to open the directory
+		cmd = exec.Command("explorer.exe", logDir)
 	case "darwin":
 		cmd = exec.Command("open", logDir)
 	case "linux":
@@ -94,5 +112,11 @@ func OpenLogDirectory() error {
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
 
-	return cmd.Start()
+	err := cmd.Start()
+	if err != nil {
+		Error("Failed to open log directory", "error", err, "directory", logDir)
+		return fmt.Errorf("failed to open directory: %w", err)
+	}
+
+	return nil
 }

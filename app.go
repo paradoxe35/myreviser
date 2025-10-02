@@ -5,11 +5,11 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/input"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
-	"github.com/paradoxe35/myreviser-go/internal/revision"
-	"github.com/paradoxe35/myreviser-go/ui"
+	"github.com/paradoxe35/myreviser/internal/config"
+	"github.com/paradoxe35/myreviser/internal/input"
+	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/revision"
+	"github.com/paradoxe35/myreviser/ui"
 )
 
 // Application represents the main application
@@ -17,7 +17,7 @@ type Application struct {
 	app           fyne.App
 	mainWindow    *ui.MainWindow
 	config        *config.Config
-	hotkeyManager *input.HotkeyManager
+	hotkeyManager *input.FFIHotkeyManager
 	processor     *revision.Processor
 	notifications *ui.NotificationManager
 }
@@ -30,8 +30,11 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 		return nil, fmt.Errorf("failed to create processor: %w", err)
 	}
 
-	// Create hotkey manager
-	hotkeyManager := input.NewHotkeyManager()
+	// Create FFI hotkey manager
+	hotkeyManager := input.NewFFIHotkeyManager()
+	if hotkeyManager == nil {
+		return nil, fmt.Errorf("failed to create FFI hotkey manager")
+	}
 
 	// Create notification manager
 	notifications := ui.NewNotificationManager(app)
@@ -51,9 +54,21 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Setup hotkeys
 	application.setupHotkeys()
 
+	// Listen for config changes to reload hotkeys
+	config.RegisterListener(func(newCfg *config.Config) {
+		logger.Info("Config changed, reloading hotkeys")
+		// Update application config reference
+		application.config = newCfg
+		// Reload hotkeys with new bindings
+		application.reloadHotkeysFromConfig()
+	})
+
 	// Setup system tray if available
 	if desk, ok := app.(desktop.App); ok {
-		ui.SetupSystemTray(desk, mainWindow)
+		ui.SetupSystemTray(desk, mainWindow, func() error {
+			application.Stop()
+			return nil
+		})
 	}
 
 	// Setup window close intercept
@@ -66,14 +81,8 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 
 // setupHotkeys configures the hotkey handlers
 func (a *Application) setupHotkeys() {
-	// Set bindings from config
-	a.hotkeyManager.SetBindings(
-		a.config.Hotkeys.SelectAll,
-		a.config.Hotkeys.Selection,
-	)
-
-	// Register handlers
-	a.hotkeyManager.RegisterHandler("select_all", func() {
+	// Register select_all handler with FFI
+	a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.SelectAll, "select_all", func() {
 		logger.Info("Select all hotkey triggered")
 
 		// Check if already processing
@@ -91,7 +100,8 @@ func (a *Application) setupHotkeys() {
 		}
 	})
 
-	a.hotkeyManager.RegisterHandler("selection", func() {
+	// Register selection handler with FFI
+	a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.Selection, "selection", func() {
 		logger.Info("Selection hotkey triggered")
 
 		// Check if already processing
@@ -108,6 +118,41 @@ func (a *Application) setupHotkeys() {
 			logger.Info("Text revised successfully")
 		}
 	})
+}
+
+// reloadHotkeysFromConfig stops current hotkeys and re-registers with new config
+func (a *Application) reloadHotkeysFromConfig() {
+	logger.Info("Reloading hotkeys from updated config")
+
+	// Stop current hotkey manager
+	if a.hotkeyManager != nil {
+		a.hotkeyManager.Stop()
+		a.hotkeyManager.Close()
+	}
+
+	// Create new hotkey manager
+	newManager := input.NewFFIHotkeyManager()
+	if newManager == nil {
+		logger.Error("Failed to create new hotkey manager")
+		a.notifications.ShowError("Hotkey Reload Failed", "Failed to reload hotkeys")
+		return
+	}
+
+	a.hotkeyManager = newManager
+
+	// Re-register hotkeys with new config
+	a.setupHotkeys()
+
+	// Start the new hotkey manager
+	if err := a.hotkeyManager.Start(); err != nil {
+		logger.Error("Failed to start new hotkey manager", "error", err)
+		a.notifications.ShowError("Hotkey Reload Failed", "Failed to start hotkeys: "+err.Error())
+		return
+	}
+
+	logger.Info("Hotkeys reloaded successfully",
+		"select_all", a.config.Hotkeys.SelectAll,
+		"selection", a.config.Hotkeys.Selection)
 }
 
 // Start starts the application
@@ -133,8 +178,16 @@ func (a *Application) Start() error {
 func (a *Application) Stop() {
 	logger.Info("Stopping application")
 
-	// Stop hotkey manager
-	a.hotkeyManager.Stop()
+	// Stop and close FFI hotkey manager
+	if a.hotkeyManager != nil {
+		a.hotkeyManager.Stop()
+		a.hotkeyManager.Close()
+	}
+
+	// Close processor resources
+	if a.processor != nil {
+		a.processor.Close()
+	}
 
 	// Quit the app
 	a.app.Quit()

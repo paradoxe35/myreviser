@@ -1,6 +1,6 @@
 // MyReviser - AI-powered text revision tool
 // Author: Paradoxe Ng <contact@pngwasi.me>
-// Repository: https://github.com/paradoxe35/myreviser-go
+// Repository: https://github.com/paradoxe35/myreviser
 
 package main
 
@@ -11,9 +11,9 @@ import (
 
 	"fyne.io/fyne/v2/app"
 	singleinstance "github.com/allan-simon/go-singleinstance"
-	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
-	"github.com/paradoxe35/myreviser-go/ui"
+	"github.com/paradoxe35/myreviser/internal/config"
+	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/ui"
 )
 
 var (

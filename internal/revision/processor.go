@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/paradoxe35/myreviser-go/internal/ai"
-	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/input"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/ai"
+	"github.com/paradoxe35/myreviser/internal/config"
+	"github.com/paradoxe35/myreviser/internal/input"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 // Processor handles text revision operations
@@ -18,13 +18,13 @@ type Processor struct {
 	mu               sync.Mutex
 	config           *config.Config
 	providerFactory  *ai.ProviderFactory
-	clipboardManager *input.ClipboardManager
+	clipboardManager *input.FFIClipboardManager
 	processing       bool
 }
 
 // NewProcessor creates a new revision processor
 func NewProcessor(cfg *config.Config) (*Processor, error) {
-	clipManager, err := input.NewClipboardManager()
+	clipManager, err := input.NewFFIClipboardManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clipboard manager: %w", err)
 	}
@@ -116,20 +116,33 @@ func (p *Processor) ProcessSelectAll() error {
 
 	logger.Info("Starting select all revision")
 
+	// Initial delay to allow any ongoing clipboard operations to finish
+	// and ensure the hotkey press is fully processed
+	time.Sleep(200 * time.Millisecond)
+
 	// Save current clipboard
 	if err := p.clipboardManager.SaveCurrent(); err != nil {
 		return fmt.Errorf("failed to save clipboard: %w", err)
 	}
 
+	// Small delay saving
+	time.Sleep(100 * time.Millisecond)
+
 	// Select all text
-	if err := input.SimulateSelectAll(); err != nil {
+	if err := input.FFISimulateSelectAll(); err != nil {
 		return fmt.Errorf("failed to select all: %w", err)
 	}
 
+	// Small delay after select all before copy
+	time.Sleep(100 * time.Millisecond)
+
 	// Copy to clipboard
-	if err := input.SimulateCopy(); err != nil {
+	if err := input.FFISimulateCopy(); err != nil {
 		return fmt.Errorf("failed to copy: %w", err)
 	}
+
+	// Allow clipboard to update before reading (increased from 100ms)
+	time.Sleep(200 * time.Millisecond)
 
 	// Get text from clipboard
 	text, err := p.clipboardManager.GetText()
@@ -144,21 +157,18 @@ func (p *Processor) ProcessSelectAll() error {
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
-	// Replace the text
-	if err := p.clipboardManager.SetText(revisedText); err != nil {
-		p.clipboardManager.Restore()
-		return fmt.Errorf("failed to set revised text: %w", err)
-	}
-
-	// Select all again and paste
-	if err := input.SimulateSelectAll(); err != nil {
+	// Select all again and paste revised text (uses FFI helper with built-in delay)
+	if err := input.FFISimulateSelectAll(); err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to select all for paste: %w", err)
 	}
 
-	if err := input.SimulatePaste(); err != nil {
+	// add small delay
+	time.Sleep(100 * time.Millisecond)
+
+	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		p.clipboardManager.Restore()
-		return fmt.Errorf("failed to paste: %w", err)
+		return fmt.Errorf("failed to replace text: %w", err)
 	}
 
 	// Restore original clipboard
@@ -190,7 +200,10 @@ func (p *Processor) ProcessSelection() error {
 
 	logger.Info("Starting selection revision")
 
-	// Capture selected text
+	// Initial delay to allow any ongoing clipboard operations to finish
+	time.Sleep(200 * time.Millisecond)
+
+	// Capture selected text (saves clipboard, copies, returns text)
 	text, err := p.clipboardManager.CaptureSelectedText()
 	if err != nil {
 		return fmt.Errorf("failed to capture selected text: %w", err)
@@ -206,9 +219,14 @@ func (p *Processor) ProcessSelection() error {
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
-	// Replace selected text
+	// Replace selected text (paste revised text)
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		return fmt.Errorf("failed to replace selected text: %w", err)
+	}
+
+	// Restore original clipboard AFTER paste completes
+	if err := p.clipboardManager.Restore(); err != nil {
+		logger.Warn("Failed to restore clipboard after paste", "error", err)
 	}
 
 	logger.Info("Selection revision completed")
@@ -240,7 +258,9 @@ func (p *Processor) reviseText(text string) (string, error) {
 
 	logger.Info("Sending text to AI provider",
 		"provider", provider.GetName(),
-		"text_length", len(text))
+		"text", text,
+		"text_length", len(text),
+	)
 
 	// Revise text with latest system prompt
 	revised, err := provider.ReviseText(ctx, text, p.config.Revision.SystemPrompt)
@@ -249,8 +269,10 @@ func (p *Processor) reviseText(text string) (string, error) {
 	}
 
 	logger.Info("Text revised successfully",
+		"revised", revised,
 		"original_length", len(text),
-		"revised_length", len(revised))
+		"revised_length", len(revised),
+	)
 
 	return revised, nil
 }
@@ -269,4 +291,11 @@ func (p *Processor) IsProcessing() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.processing
+}
+
+// Close releases the processor resources
+func (p *Processor) Close() {
+	if p.clipboardManager != nil {
+		p.clipboardManager.Close()
+	}
 }

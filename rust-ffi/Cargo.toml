@@ -1,0 +1,45 @@
+[package]
+name = "myreviser-ffi"
+version = "0.1.0"
+edition = "2021"
+authors = ["MyReviser Team"]
+description = "Rust FFI library for MyReviser system input functionality"
+license = "MIT"
+
+[lib]
+name = "myreviser_ffi"
+crate-type = ["staticlib"]  # Static library for Go CGO
+
+[dependencies]
+# Core dependencies for system input
+rdev = "0.5"          # Global hotkeys and input monitoring
+arboard = "3.6"       # Clipboard management
+enigo = "0.2"         # Keyboard/mouse simulation
+
+# Async runtime
+tokio = { version = "1.41", features = ["rt", "sync", "time"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+# Utilities
+once_cell = "1.20"
+parking_lot = "0.12"
+
+# FFI-specific
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.28"
+
+[profile.release]
+opt-level = "z"        # Optimize for size
+lto = true             # Link-time optimization
+codegen-units = 1      # Single codegen unit for better optimization
+strip = true           # Strip debug symbols
+panic = "abort"        # Reduce binary size (no unwinding)

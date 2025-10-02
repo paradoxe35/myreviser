@@ -12,10 +12,10 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/paradoxe35/myreviser-go/internal/ai"
-	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/input"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/ai"
+	"github.com/paradoxe35/myreviser/internal/config"
+	"github.com/paradoxe35/myreviser/internal/input"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 const (
@@ -31,7 +31,7 @@ type MainWindow struct {
 	fyne.Window
 	app           fyne.App
 	config        *config.Config
-	hotkeyManager *input.HotkeyManager
+	hotkeyManager *input.FFIHotkeyManager
 
 	// Data bindings
 	providerBinding        binding.String
@@ -50,7 +50,7 @@ type MainWindow struct {
 	baseURLEntry     *widget.Entry
 }
 
-func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.HotkeyManager) *MainWindow {
+func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHotkeyManager) *MainWindow {
 	window := app.NewWindow("MyReviser Settings")
 
 	// Set fixed window size
@@ -258,7 +258,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	modelLabel.TextStyle.Bold = true
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
-	modelEntry.PlaceHolder = "e.g., gpt-4o-mini (optional)"
+	modelEntry.PlaceHolder = "e.g., gpt-4o (optional)"
 
 	// Base URL section (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL:")
@@ -307,6 +307,7 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectAllCapture := NewHotkeyCapture(w.hotkeySelectBinding, "Click 'Capture' to set hotkey")
 	selectAllCapture.window = w.Window // Set window reference for focus
 	// Connect callbacks to disable/enable global hotkeys during capture
+	// Global hotkey library requires at least one non-modifier key on all platforms
 	selectAllCapture.SetAllowModifierOnly(true)
 	selectAllCapture.onCaptureStart = func() {
 		if w.hotkeyManager != nil {
@@ -324,7 +325,7 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectionLabel.TextStyle.Bold = true
 	selectionCapture := NewHotkeyCapture(w.hotkeySelectionBinding, "Click 'Capture' to set hotkey")
 	selectionCapture.window = w.Window // Set window reference for focus
-	// Allow modifier-only combo for Selection (e.g., Ctrl+Win on Windows)
+	// Require at least one non-modifier key; modifier-only (e.g., Ctrl+Win) is not supported by OS/global hotkey APIs
 	selectionCapture.SetAllowModifierOnly(true)
 
 	// Connect callbacks to disable/enable global hotkeys during capture

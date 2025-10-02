@@ -65,7 +65,7 @@ func Default() *Config {
 			Providers: map[string]ProviderSettings{
 				"openai": {
 					BaseURL: "https://api.openai.com/v1",
-					Model:   "gpt-4o-mini",
+					Model:   "gpt-4o",
 				},
 				"claude": {
 					BaseURL: "https://api.anthropic.com",

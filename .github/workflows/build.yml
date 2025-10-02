@@ -17,12 +17,13 @@ on:
 
 env:
   GO_VERSION: "1.24"
+  RUST_VERSION: "stable"
 
 jobs:
   build-linux:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,6 +34,36 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-ffi/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -42,46 +73,61 @@ jobs:
             libx11-dev \
             libxkbfile-dev \
             libxtst-dev \
+            libxdo-dev \
+            libxi-dev \
             libpng-dev \
             libjpeg-dev \
             libxinerama-dev \
             libxcb-xkb-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
             libxkbcommon-x11-dev \
             libxcursor-dev \
             libxrandr-dev \
-            libxi-dev \
             libxrender-dev \
             libxfixes-dev \
             libxxf86vm-dev \
             libxkbcommon-dev
 
-      - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download
 
-      - name: Bundle resources
+      - name: Build Rust FFI library
         run: |
-          if [ -f assets/icon.png ]; then
-            fyne bundle -o bundled.go assets/icon.png
-          fi
+          cd rust-ffi
+          cargo build --release
+          cd ..
+          mkdir -p lib
+          cp rust-ffi/target/release/libmyreviser_ffi.a lib/
 
-      - name: Build application
+      - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-linux-${{ matrix.arch }}
+          # fyne package creates MyReviser.tar.xz for Linux
+          fyne package --icon assets/icon.png --name MyReviser --release
 
-      - name: Package with Fyne
-        env:
-          CGO_ENABLED: 1
-        run: |
-          if [ -f assets/icon.png ]; then
-            fyne package -os linux -icon assets/icon.png -name MyReviser -release
+          # Extract MyReviser.tar.xz
+          tar -xf MyReviser.tar.xz
+
+          # Find the binary in usr/local/bin (module name is myreviser-go)
+          BINARY=$(find usr/local/bin -type f -executable | head -n 1)
+          if [ -n "$BINARY" ]; then
+            echo "Found binary: $BINARY"
+            mv "$BINARY" myreviser-linux-${{ matrix.arch }}
+          else
+            echo "Error: No binary found"
+            ls -la usr/local/bin/
+            exit 1
           fi
+
+          # Clean up
+          rm -rf usr MyReviser.tar.xz
 
       - name: Create portable archive
         run: |
@@ -125,7 +171,16 @@ jobs:
 
           # Create AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          mv *.AppImage myreviser-linux-${{ matrix.arch }}.AppImage
+
+          # Find and rename the generated AppImage
+          APPIMAGE_FILE=$(find . -maxdepth 1 -name "*.AppImage" -type f | head -n 1)
+          if [ -n "$APPIMAGE_FILE" ]; then
+            mv "$APPIMAGE_FILE" myreviser-linux-${{ matrix.arch }}.AppImage
+          else
+            echo "Error: AppImage file not found"
+            ls -la
+            exit 1
+          fi
 
       - name: Create .deb package
         run: |
@@ -138,16 +193,21 @@ jobs:
           cp myreviser-linux-${{ matrix.arch }} dist/deb/usr/local/bin/myreviser
           chmod +x dist/deb/usr/local/bin/myreviser
 
+          # Sanitize version for Debian (replace invalid chars with -)
+          DEB_VERSION=$(echo "${GITHUB_REF_NAME#v}" | sed 's/[^0-9a-zA-Z.]/-/g' | sed 's/^-//' | sed 's/-$//')
+          [ -z "$DEB_VERSION" ] && DEB_VERSION="0.0.0-dev"
+
           # Create control file
           cat > dist/deb/DEBIAN/control <<EOF
           Package: myreviser
-          Version: ${GITHUB_REF_NAME#v}
+          Version: $DEB_VERSION
           Architecture: ${{ matrix.arch }}
           Maintainer: Paradoxe Ng <contact@pngwasi.me>
-          Description: AI-powered text revision tool
+          Description: AI-powered text revision tool with Rust FFI
            MyReviser is a system tray application that provides global hotkeys
            for instant text enhancement using AI providers.
-          Depends: libgl1-mesa-glx, libx11-6, libxcursor1, libxrandr2
+           Built with Go and Rust FFI for optimal performance.
+          Depends: libgl1-mesa-glx, libx11-6, libxcursor1, libxrandr2, libxtst6, xdotool
           EOF
 
           # Create desktop entry
@@ -193,7 +253,7 @@ jobs:
   build-windows:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -204,40 +264,67 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-ffi/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - name: Install MinGW
         run: |
           choco install mingw -y
 
-      - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Add Rust GNU target
+        run: rustup target add x86_64-pc-windows-gnu
+
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download
 
-      - name: Bundle resources
+      - name: Build Rust FFI library
         run: |
-          if (Test-Path "assets/icon.png") {
-            fyne bundle -o bundled.go assets/icon.png
-          }
+          cd rust-ffi
+          cargo build --release --target x86_64-pc-windows-gnu
+          cd ..
+          New-Item -ItemType Directory -Force -Path lib
+          Copy-Item rust-ffi\target\x86_64-pc-windows-gnu\release\libmyreviser_ffi.a lib\
 
-      - name: Build application
+      - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          $buildTime = Get-Date -Format "yyyy-MM-dd_HH:mm:ss"
-          go build -ldflags "-s -w -H=windowsgui -X main.Version=$version -X main.BuildTime=$buildTime" -o myreviser-windows-${{ matrix.arch }}.exe
-
-      - name: Package with Fyne
-        env:
-          CGO_ENABLED: 1
-        run: |
-          if (Test-Path "assets/icon.ico") {
-            fyne package -os windows -icon assets/icon.ico -name MyReviser -release
-          } elseif (Test-Path "assets/icon.png") {
-            fyne package -os windows -icon assets/icon.png -name MyReviser -release
+          fyne package --icon assets/icon.ico --name MyReviser --release
+          # fyne package creates MyReviser.exe, rename it
+          if (Test-Path "MyReviser.exe") {
+            Move-Item MyReviser.exe myreviser-windows-${{ matrix.arch }}.exe
           }
 
       - name: Create portable ZIP
@@ -256,12 +343,16 @@ jobs:
           choco install nsis -y
           $env:Path += ";C:\Program Files (x86)\NSIS"
 
+          # Sanitize version for Windows installer
+          $VERSION = "${{ github.ref_name }}" -replace '^v','' -replace '[^0-9a-zA-Z.]','-'
+          if ([string]::IsNullOrEmpty($VERSION)) { $VERSION = "0.0.0-dev" }
+
           # Create NSIS script
           @"
           !define PRODUCT_NAME "MyReviser"
-          !define PRODUCT_VERSION "${{ github.ref_name }}"
+          !define PRODUCT_VERSION "$VERSION"
           !define PRODUCT_PUBLISHER "Paradoxe Ng"
-          !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser-go"
+          !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser"
 
           Name "`${PRODUCT_NAME}"
           OutFile "myreviser-windows-${{ matrix.arch }}-installer.exe"
@@ -343,84 +434,78 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-ffi/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Add Rust target for architecture
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            rustup target add aarch64-apple-darwin
+          else
+            rustup target add x86_64-apple-darwin
+          fi
+
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download
 
-      - name: Bundle resources
+      - name: Build Rust FFI library
         run: |
-          if [ -f assets/icon.png ]; then
-            fyne bundle -o bundled.go assets/icon.png
+          mkdir -p lib
+          cd rust-ffi
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cargo build --release --target aarch64-apple-darwin
+            cp target/aarch64-apple-darwin/release/libmyreviser_ffi.a ../lib/
+          else
+            cargo build --release --target x86_64-apple-darwin
+            cp target/x86_64-apple-darwin/release/libmyreviser_ffi.a ../lib/
           fi
 
-      - name: Build application
+      - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-darwin-${{ matrix.arch }}
+          fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
 
-      - name: Package with Fyne
-        env:
-          CGO_ENABLED: 1
-        run: |
-          if [ -f assets/icon.png ]; then
-            fyne package -os darwin -icon assets/icon.png -name MyReviser -release
-          fi
-
-      - name: Create .app bundle manually if needed
+      - name: Verify .app bundle created
         run: |
           if [ ! -d "MyReviser.app" ]; then
-            mkdir -p MyReviser.app/Contents/MacOS
-            mkdir -p MyReviser.app/Contents/Resources
-
-            # Copy binary
-            cp myreviser-darwin-${{ matrix.arch }} MyReviser.app/Contents/MacOS/myreviser
-            chmod +x MyReviser.app/Contents/MacOS/myreviser
-
-            # Create Info.plist
-            cat > MyReviser.app/Contents/Info.plist <<EOF
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-              <key>CFBundleExecutable</key>
-              <string>myreviser</string>
-              <key>CFBundleIdentifier</key>
-              <string>me.pngwasi.myreviser</string>
-              <key>CFBundleName</key>
-              <string>MyReviser</string>
-              <key>CFBundleDisplayName</key>
-              <string>MyReviser</string>
-              <key>CFBundleVersion</key>
-              <string>${GITHUB_REF_NAME#v}</string>
-              <key>CFBundleShortVersionString</key>
-              <string>${GITHUB_REF_NAME#v}</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>10.13</string>
-              <key>LSUIElement</key>
-              <true/>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-              <key>NSAppleEventsUsageDescription</key>
-              <string>MyReviser needs automation access for text revision</string>
-              <key>NSAccessibilityUsageDescription</key>
-              <string>MyReviser needs accessibility access for global hotkeys</string>
-            </dict>
-            </plist>
-            EOF
-
-            # Copy icon if exists
-            if [ -f assets/icon.png ]; then
-              cp assets/icon.png MyReviser.app/Contents/Resources/
-            fi
-            if [ -f assets/icon.icns ]; then
-              cp assets/icon.icns MyReviser.app/Contents/Resources/icon.icns
-            fi
+            echo "Error: MyReviser.app was not created"
+            ls -la
+            exit 1
           fi
+          echo "MyReviser.app created successfully"
 
       - name: Sign app bundle (if certificates available)
         if: env.MACOS_CERTIFICATE != ''
@@ -440,8 +525,8 @@ jobs:
           # Install create-dmg
           brew install create-dmg || true
 
-          # Create DMG
-          create-dmg \
+          # Create DMG - allow failure if create-dmg has issues
+          if create-dmg \
             --volname "MyReviser" \
             --window-pos 200 120 \
             --window-size 600 400 \
@@ -451,7 +536,11 @@ jobs:
             --app-drop-link 425 120 \
             --no-internet-enable \
             "myreviser-darwin-${{ matrix.arch }}.dmg" \
-            "MyReviser.app" || true
+            "MyReviser.app"; then
+            echo "DMG created successfully"
+          else
+            echo "Warning: DMG creation failed, but ZIP archive is available"
+          fi
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
@@ -498,24 +587,28 @@ jobs:
         with:
           files: release/*
           body: |
-            ## MyReviser ${{ github.ref_name }}
+            ## MyReviser ${{ github.ref_name }} - Now with Rust FFI! 🚀
+
+            ### ⚡ What's New in This Release
+            - **Rust FFI Integration**: Replaced problematic Go libraries with high-performance Rust FFI
+            - **Better Performance**: Faster clipboard and hotkey operations
+            - **More Reliable**: Fewer crashes, better cross-platform support
+            - **Static Linking**: All Rust code embedded in the binary
 
             ### 📦 Downloads
 
             #### Windows
             - **Portable (x64)**: `myreviser-windows-amd64-portable.zip` - Extract and run
             - **Installer (x64)**: `myreviser-windows-amd64-installer.exe` - Traditional installer
-            - **ARM64**: `myreviser-windows-arm64-portable.zip` - For ARM-based Windows devices
 
             #### macOS
-            - **Intel**: `myreviser-darwin-amd64.zip` / `myreviser-darwin-amd64.dmg`
-            - **Apple Silicon**: `myreviser-darwin-arm64.zip` / `myreviser-darwin-arm64.dmg`
+            - **Intel (x64)**: `myreviser-darwin-amd64.zip` / `myreviser-darwin-amd64.dmg`
+            - **Apple Silicon (ARM64)**: `myreviser-darwin-arm64.zip` / `myreviser-darwin-arm64.dmg`
 
             #### Linux
             - **Portable (x64)**: `myreviser-linux-amd64.tar.gz` - Extract and run
             - **AppImage (x64)**: `myreviser-linux-amd64.AppImage` - Universal Linux package
-            - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `dpkg -i`
-            - **ARM64**: `myreviser-linux-arm64.tar.gz` / `myreviser-linux-arm64.deb`
+            - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `sudo dpkg -i`
 
             ### 🔐 Verify Downloads
             Check `checksums.txt` for SHA256 hashes of all files.
@@ -523,13 +616,13 @@ jobs:
             ### 📋 System Requirements
 
             **All Platforms**:
-            - Go 1.21+ runtime dependencies
             - System tray support
 
             **Linux**:
             - X11 or Wayland
             - OpenGL support (libgl1-mesa-glx)
-            - GTK3 (optional for better theme integration)
+            - xdotool (for key simulation) - `sudo apt install xdotool`
+            - libX11, libXtst, libXi (usually pre-installed)
 
             **macOS**:
             - macOS 10.13+
@@ -557,18 +650,25 @@ jobs:
             - Global hotkeys for instant text enhancement
             - System tray integration
             - Cross-platform support
-            - Lightweight and fast (native Go with Fyne UI)
+            - High-performance Rust FFI for system operations
+            - Lightweight and fast (native Go + Rust)
+
+            ### 🔧 Technical Details
+            - **Languages**: Go 1.24 + Rust (FFI)
+            - **GUI Framework**: Fyne v2.6
+            - **System Integration**: Rust FFI (rdev, arboard, enigo)
+            - **Build**: Static Rust libraries embedded in Go binary
 
             ### 📝 Changes
             See [CHANGELOG.md](CHANGELOG.md) for details.
 
             ### 🐛 Known Issues
-            - Linux: Requires X11 libraries for global hotkeys
+            - Linux: Requires X11 libraries and xdotool for global hotkeys
             - macOS: First launch requires accessibility permissions
             - Windows: May require running as administrator for some applications
 
             ### 📚 Documentation
-            Visit our [GitHub repository](https://github.com/paradoxe35/myreviser-go) for full documentation.
+            Visit our [GitHub repository](https://github.com/paradoxe35/myreviser) for full documentation.
           draft: false
           prerelease: false
           generate_release_notes: true

@@ -433,9 +433,9 @@ func keyNameToString(key fyne.KeyName) string {
 	case fyne.KeySpace:
 		return "space"
 	case fyne.KeyEscape:
-		return "esc"
+		return "escape" // Match FFI expectation
 	case fyne.KeyReturn, fyne.KeyEnter:
-		return "enter"
+		return "return" // Match FFI expectation
 	case fyne.KeyTab:
 		return "tab"
 	case fyne.KeyBackspace:
