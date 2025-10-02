@@ -201,13 +201,26 @@ jobs:
           cat > dist/deb/DEBIAN/control <<EOF
           Package: myreviser
           Version: $DEB_VERSION
+          Section: text
+          Priority: optional
           Architecture: ${{ matrix.arch }}
           Maintainer: Paradoxe Ng <contact@pngwasi.me>
+          Homepage: https://github.com/paradoxe35/myreviser
+          Depends: libc6, libgl1, libx11-6, libxinerama1, libxtst6
           Description: AI-powered text revision tool with Rust FFI
            MyReviser is a system tray application that provides global hotkeys
-           for instant text enhancement using AI providers.
-           Built with Go and Rust FFI for optimal performance.
-          Depends: libgl1-mesa-glx, libx11-6, libxcursor1, libxrandr2, libxtst6, xdotool
+           for instant text enhancement using AI providers (OpenAI, Claude, Gemini).
+           .
+           Features:
+            - Global hotkeys for instant text revision (Ctrl+Alt+Space)
+            - Multiple AI provider support (OpenAI, Claude, Gemini)
+            - System tray integration for quick access
+            - Configurable system prompts and character limits
+            - Non-destructive clipboard management
+           .
+           Built with Go and Rust FFI for optimal cross-platform performance.
+           .
+           License: MIT
           EOF
 
           # Create desktop entry
@@ -587,88 +600,66 @@ jobs:
         with:
           files: release/*
           body: |
-            ## MyReviser ${{ github.ref_name }} - Now with Rust FFI! 🚀
+            MyReviser ${{ github.ref_name }}
 
-            ### ⚡ What's New in This Release
-            - **Rust FFI Integration**: Replaced problematic Go libraries with high-performance Rust FFI
-            - **Better Performance**: Faster clipboard and hotkey operations
-            - **More Reliable**: Fewer crashes, better cross-platform support
-            - **Static Linking**: All Rust code embedded in the binary
+            AI-powered text revision tool with global hotkeys and multi-provider support.
 
-            ### 📦 Downloads
+            ## Downloads
 
-            #### Windows
-            - **Portable (x64)**: `myreviser-windows-amd64-portable.zip` - Extract and run
-            - **Installer (x64)**: `myreviser-windows-amd64-installer.exe` - Traditional installer
+            **Windows**
+            - Portable (x64): `myreviser-windows-amd64-portable.zip`
+            - Installer (x64): `myreviser-windows-amd64-installer.exe`
 
-            #### macOS
-            - **Intel (x64)**: `myreviser-darwin-amd64.zip` / `myreviser-darwin-amd64.dmg`
-            - **Apple Silicon (ARM64)**: `myreviser-darwin-arm64.zip` / `myreviser-darwin-arm64.dmg`
+            **macOS**
+            - Intel (x64): `myreviser-darwin-amd64.dmg`
+            - Apple Silicon (ARM64): `myreviser-darwin-arm64.dmg`
 
-            #### Linux
-            - **Portable (x64)**: `myreviser-linux-amd64.tar.gz` - Extract and run
-            - **AppImage (x64)**: `myreviser-linux-amd64.AppImage` - Universal Linux package
-            - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `sudo dpkg -i`
+            **Linux**
+            - Portable (x64): `myreviser-linux-amd64.tar.gz`
+            - AppImage (x64): `myreviser-linux-amd64.AppImage`
+            - Debian/Ubuntu (x64): `myreviser-linux-amd64.deb`
 
-            ### 🔐 Verify Downloads
-            Check `checksums.txt` for SHA256 hashes of all files.
+            Verify downloads with `checksums.txt`.
 
-            ### 📋 System Requirements
+            ## Installation
 
-            **All Platforms**:
-            - System tray support
-
+            **Windows**: Run installer or extract portable ZIP
+            **macOS**: Open DMG and drag to Applications
             **Linux**:
-            - X11 or Wayland
-            - OpenGL support (libgl1-mesa-glx)
-            - xdotool (for key simulation) - `sudo apt install xdotool`
-            - libX11, libXtst, libXi (usually pre-installed)
+            ```bash
+            # AppImage
+            chmod +x myreviser-linux-amd64.AppImage
+            ./myreviser-linux-amd64.AppImage
 
-            **macOS**:
-            - macOS 10.13+
-            - Grant accessibility permissions for global hotkeys
+            # Debian/Ubuntu
+            sudo dpkg -i myreviser-linux-amd64.deb
+            ```
 
-            **Windows**:
-            - Windows 10 or later
-            - Visual C++ Redistributable (usually pre-installed)
+            ## Quick Start
 
-            ### 🚀 Quick Start
+            1. Launch MyReviser (appears in system tray)
+            2. Right-click tray icon > Settings
+            3. Configure AI provider (OpenAI, Claude, or Gemini)
+            4. Set hotkeys (optional)
+            5. Use global hotkeys to revise text
 
-            1. Download the appropriate file for your system
-            2. Extract (for portable versions) or install
-            3. Launch MyReviser - it will appear in your system tray
-            4. Click the tray icon → Settings to configure your AI provider
-            5. Set up your preferred hotkeys
-            6. Use global hotkeys to revise text instantly!
+            ## Default Hotkeys
 
-            ### ⌨️ Default Hotkeys
-            - **Select All & Revise**: `Ctrl+Alt+Space` (Linux/Windows), `Cmd+Option+Space` (macOS)
-            - **Revise Selection**: `Ctrl+Super` (Linux), `Ctrl+Win` (Windows), `Ctrl+Cmd` (macOS)
+            - Select All & Revise: `Ctrl+Alt+Space` (Linux/Windows), `Cmd+Option+Space` (macOS)
+            - Revise Selection: `Ctrl+Super` (Linux), `Ctrl+Win` (Windows), `Ctrl+Cmd` (macOS)
 
-            ### 🎯 Features
-            - AI-powered text revision with multiple providers (OpenAI, Claude, Gemini)
-            - Global hotkeys for instant text enhancement
-            - System tray integration
-            - Cross-platform support
-            - High-performance Rust FFI for system operations
-            - Lightweight and fast (native Go + Rust)
+            ## Requirements
 
-            ### 🔧 Technical Details
-            - **Languages**: Go 1.24 + Rust (FFI)
-            - **GUI Framework**: Fyne v2.6
-            - **System Integration**: Rust FFI (rdev, arboard, enigo)
-            - **Build**: Static Rust libraries embedded in Go binary
+            **Linux**: X11, OpenGL (libgl1), libX11, libXtst
+            **macOS**: macOS 10.13+, accessibility permissions required
+            **Windows**: Windows 10+
 
-            ### 📝 Changes
-            See [CHANGELOG.md](CHANGELOG.md) for details.
+            ## Technical Details
 
-            ### 🐛 Known Issues
-            - Linux: Requires X11 libraries and xdotool for global hotkeys
-            - macOS: First launch requires accessibility permissions
-            - Windows: May require running as administrator for some applications
+            Built with Go 1.24 + Rust FFI (rdev, arboard, enigo) for optimal performance.
 
-            ### 📚 Documentation
-            Visit our [GitHub repository](https://github.com/paradoxe35/myreviser) for full documentation.
+            See [CHANGELOG.md](CHANGELOG.md) for full release notes.
+            Visit [GitHub](https://github.com/paradoxe35/myreviser) for documentation.
           draft: false
           prerelease: false
           generate_release_notes: true
