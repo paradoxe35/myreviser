@@ -30,6 +30,7 @@ myreviser.exe
 *.tar.gz
 *.tar.xz
 *.zip
+MyReviser.app
 
 # Fyne bundled resources
 bundled.go
@@ -51,3 +52,4 @@ rust/
 .myreviser/
 .myscript/
 *.lock
+tmp/

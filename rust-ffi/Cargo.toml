@@ -33,7 +33,6 @@ parking_lot = "0.12"
 
 # FFI-specific
 libc = "0.2"
-cbindgen = "0.29"
 
 [build-dependencies]
 cbindgen = "0.29"
