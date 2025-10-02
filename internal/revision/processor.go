@@ -118,7 +118,7 @@ func (p *Processor) ProcessSelectAll() error {
 
 	// Initial delay to allow any ongoing clipboard operations to finish
 	// and ensure the hotkey press is fully processed
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 
 	// Save current clipboard
 	if err := p.clipboardManager.SaveCurrent(); err != nil {
@@ -201,7 +201,7 @@ func (p *Processor) ProcessSelection() error {
 	logger.Info("Starting selection revision")
 
 	// Initial delay to allow any ongoing clipboard operations to finish
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 
 	// Capture selected text (saves clipboard, copies, returns text)
 	text, err := p.clipboardManager.CaptureSelectedText()
