@@ -10,7 +10,7 @@ package input
 
 // macOS linking (partial static, frameworks required)
 #cgo darwin LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
-#cgo darwin LDFLAGS: -framework CoreFoundation -framework Security -framework AppKit
+#cgo darwin LDFLAGS: -framework CoreFoundation -framework Security -framework AppKit -framework Carbon
 
 // Windows static linking
 #cgo windows LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a

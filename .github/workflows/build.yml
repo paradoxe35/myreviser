@@ -66,8 +66,8 @@ jobs:
             libxxf86vm-dev \
             libxkbcommon-dev
 
-      - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download
@@ -136,7 +136,16 @@ jobs:
 
           # Create AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          mv *.AppImage myreviser-linux-${{ matrix.arch }}.AppImage
+
+          # Find and rename the generated AppImage
+          APPIMAGE_FILE=$(find . -maxdepth 1 -name "*.AppImage" -type f | head -n 1)
+          if [ -n "$APPIMAGE_FILE" ]; then
+            mv "$APPIMAGE_FILE" myreviser-linux-${{ matrix.arch }}.AppImage
+          else
+            echo "Error: AppImage file not found"
+            ls -la
+            exit 1
+          fi
 
       - name: Create .deb package
         run: |
@@ -227,8 +236,8 @@ jobs:
         run: |
           choco install mingw -y
 
-      - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download
@@ -374,8 +383,8 @@ jobs:
             rustup target add x86_64-apple-darwin
           fi
 
-      - name: Install Fyne
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download

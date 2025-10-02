@@ -10,7 +10,7 @@ package input
 
 // macOS
 #cgo darwin LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
-#cgo darwin LDFLAGS: -framework CoreFoundation -framework AppKit -framework ApplicationServices
+#cgo darwin LDFLAGS: -framework CoreFoundation -framework AppKit -framework ApplicationServices -framework Carbon
 
 // Windows
 #cgo windows LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
