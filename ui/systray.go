@@ -7,7 +7,7 @@ import (
 )
 
 // SetupSystemTray sets up the system tray icon and menu
-func SetupSystemTray(desk desktop.App, mainWindow *MainWindow) {
+func SetupSystemTray(desk desktop.App, mainWindow *MainWindow, onQuit func() error) {
 	// Set system tray menu
 	menu := fyne.NewMenu("MyReviser",
 		fyne.NewMenuItem("Show", func() {
@@ -26,7 +26,9 @@ func SetupSystemTray(desk desktop.App, mainWindow *MainWindow) {
 		}),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Quit", func() {
-			mainWindow.app.Quit()
+			if err := onQuit(); err != nil {
+				mainWindow.app.Quit()
+			}
 		}),
 	)
 
