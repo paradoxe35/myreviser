@@ -109,7 +109,7 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -icon assets/icon.png -o myreviser-linux-${{ matrix.arch }}
+          fyne build -icon assets/icon.png -o myreviser-linux-${{ matrix.arch }}
 
       - name: Create portable archive
         run: |
@@ -303,7 +303,7 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -icon assets/icon.ico -o myreviser-windows-${{ matrix.arch }}.exe
+          fyne build -icon assets/icon.ico -o myreviser-windows-${{ matrix.arch }}.exe
 
       - name: Create portable ZIP
         run: |
