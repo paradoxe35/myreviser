@@ -199,20 +199,22 @@ test-go:
 # Packaging for All Platforms
 # ============================================================================
 package-all: clean
-	@echo "Building for all platforms..."
+	@echo "Building for all platforms with Fyne..."
 	@mkdir -p $(BIN_DIR)
+	@command -v fyne >/dev/null 2>&1 || { \
+		echo "Installing Fyne CLI..."; \
+		go install fyne.io/fyne/v2/cmd/fyne@latest; \
+	}
 
 	@echo ""
-	@echo "=== Building for Linux (static) ==="
+	@echo "=== Building for Linux ==="
 	$(MAKE) build-rust-linux
 	CGO_ENABLED=1 \
 		CC=musl-gcc \
 		GOOS=linux \
 		GOARCH=amd64 \
-		go build \
-			-ldflags "$(LDFLAGS) -linkmode external -extldflags '-static'" \
-			-o $(BIN_DIR)/myreviser-linux-amd64 \
-			.
+		fyne build -release \
+			-o $(BIN_DIR)/myreviser-linux-amd64
 
 	@echo ""
 	@echo "=== Building for macOS ==="
@@ -220,22 +222,18 @@ package-all: clean
 	CGO_ENABLED=1 \
 		GOOS=darwin \
 		GOARCH=amd64 \
-		go build \
-			-ldflags "$(LDFLAGS)" \
-			-o $(BIN_DIR)/myreviser-darwin-amd64 \
-			.
+		fyne build -release \
+			-o $(BIN_DIR)/myreviser-darwin-amd64
 
 	@echo ""
-	@echo "=== Building for Windows (static) ==="
+	@echo "=== Building for Windows ==="
 	$(MAKE) build-rust-windows
 	CGO_ENABLED=1 \
 		CC=x86_64-w64-mingw32-gcc \
 		GOOS=windows \
 		GOARCH=amd64 \
-		go build \
-			-ldflags "$(LDFLAGS) -H windowsgui -linkmode external -extldflags '-static'" \
-			-o $(BIN_DIR)/myreviser-windows-amd64.exe \
-			.
+		fyne build -release \
+			-o $(BIN_DIR)/myreviser-windows-amd64.exe
 
 	@echo ""
 	@echo "✓ All platforms built successfully!"

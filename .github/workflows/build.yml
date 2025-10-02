@@ -23,7 +23,7 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -205,7 +205,7 @@ jobs:
   build-windows:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -545,17 +545,15 @@ jobs:
             #### Windows
             - **Portable (x64)**: `myreviser-windows-amd64-portable.zip` - Extract and run
             - **Installer (x64)**: `myreviser-windows-amd64-installer.exe` - Traditional installer
-            - **ARM64**: `myreviser-windows-arm64-portable.zip` - For ARM-based Windows devices
 
             #### macOS
-            - **Intel**: `myreviser-darwin-amd64.zip` / `myreviser-darwin-amd64.dmg`
-            - **Apple Silicon**: `myreviser-darwin-arm64.zip` / `myreviser-darwin-arm64.dmg`
+            - **Intel (x64)**: `myreviser-darwin-amd64.zip` / `myreviser-darwin-amd64.dmg`
+            - **Apple Silicon (ARM64)**: `myreviser-darwin-arm64.zip` / `myreviser-darwin-arm64.dmg`
 
             #### Linux
             - **Portable (x64)**: `myreviser-linux-amd64.tar.gz` - Extract and run
             - **AppImage (x64)**: `myreviser-linux-amd64.AppImage` - Universal Linux package
             - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `sudo dpkg -i`
-            - **ARM64**: `myreviser-linux-arm64.tar.gz` / `myreviser-linux-arm64.deb`
 
             ### 🔐 Verify Downloads
             Check `checksums.txt` for SHA256 hashes of all files.
