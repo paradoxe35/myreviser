@@ -31,7 +31,7 @@ type MainWindow struct {
 	fyne.Window
 	app           fyne.App
 	config        *config.Config
-	hotkeyManager *input.HotkeyManager
+	hotkeyManager *input.FFIHotkeyManager
 
 	// Data bindings
 	providerBinding        binding.String
@@ -50,7 +50,7 @@ type MainWindow struct {
 	baseURLEntry     *widget.Entry
 }
 
-func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.HotkeyManager) *MainWindow {
+func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHotkeyManager) *MainWindow {
 	window := app.NewWindow("MyReviser Settings")
 
 	// Set fixed window size

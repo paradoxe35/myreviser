@@ -17,7 +17,7 @@ type Application struct {
 	app           fyne.App
 	mainWindow    *ui.MainWindow
 	config        *config.Config
-	hotkeyManager *input.HotkeyManager
+	hotkeyManager *input.FFIHotkeyManager
 	processor     *revision.Processor
 	notifications *ui.NotificationManager
 }
@@ -30,8 +30,11 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 		return nil, fmt.Errorf("failed to create processor: %w", err)
 	}
 
-	// Create hotkey manager
-	hotkeyManager := input.NewHotkeyManager()
+	// Create FFI hotkey manager
+	hotkeyManager := input.NewFFIHotkeyManager()
+	if hotkeyManager == nil {
+		return nil, fmt.Errorf("failed to create FFI hotkey manager")
+	}
 
 	// Create notification manager
 	notifications := ui.NewNotificationManager(app)
@@ -66,14 +69,8 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 
 // setupHotkeys configures the hotkey handlers
 func (a *Application) setupHotkeys() {
-	// Set bindings from config
-	a.hotkeyManager.SetBindings(
-		a.config.Hotkeys.SelectAll,
-		a.config.Hotkeys.Selection,
-	)
-
-	// Register handlers
-	a.hotkeyManager.RegisterHandler("select_all", func() {
+	// Register select_all handler with FFI
+	a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.SelectAll, "select_all", func() {
 		logger.Info("Select all hotkey triggered")
 
 		// Check if already processing
@@ -91,7 +88,8 @@ func (a *Application) setupHotkeys() {
 		}
 	})
 
-	a.hotkeyManager.RegisterHandler("selection", func() {
+	// Register selection handler with FFI
+	a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.Selection, "selection", func() {
 		logger.Info("Selection hotkey triggered")
 
 		// Check if already processing
@@ -133,8 +131,16 @@ func (a *Application) Start() error {
 func (a *Application) Stop() {
 	logger.Info("Stopping application")
 
-	// Stop hotkey manager
-	a.hotkeyManager.Stop()
+	// Stop and close FFI hotkey manager
+	if a.hotkeyManager != nil {
+		a.hotkeyManager.Stop()
+		a.hotkeyManager.Close()
+	}
+
+	// Close processor resources
+	if a.processor != nil {
+		a.processor.Close()
+	}
 
 	// Quit the app
 	a.app.Quit()

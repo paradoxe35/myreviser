@@ -119,8 +119,7 @@ impl SimpleHotkeyManager {
                                     ) {
                                         // Trigger callback
                                         let action_cstr =
-                                            std::ffi::CString::new(binding.action.clone())
-                                                .unwrap();
+                                            std::ffi::CString::new(binding.action.clone()).unwrap();
                                         (binding.callback)(action_cstr.as_ptr());
                                     }
                                 }

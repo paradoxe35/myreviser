@@ -151,18 +151,19 @@ build-rust-windows:
 # Build Go Application
 # ============================================================================
 build-go:
-	@echo "Building Go application for $(CURRENT_OS)..."
+	@echo "Building Go application with Fyne for $(CURRENT_OS)..."
 	@mkdir -p $(BIN_DIR)
 	@test -f $(LIB_DIR)/libmyreviser_ffi.a || { \
 		echo "Error: Rust FFI library not found. Run 'make build-rust' first."; \
 		exit 1; \
 	}
+	@command -v fyne >/dev/null 2>&1 || { \
+		echo "Installing Fyne CLI..."; \
+		go install fyne.io/fyne/v2/cmd/fyne@latest; \
+	}
 	CGO_ENABLED=1 \
 	CC=$(CC) \
-	go build \
-		-ldflags "$(LDFLAGS) $(EXTRA_LDFLAGS)" \
-		-o $(BIN_DIR)/myreviser$(BIN_EXT) \
-		.
+	fyne build -release -o $(BIN_DIR)/myreviser$(BIN_EXT)
 	@echo "Go application built successfully!"
 	@echo "Binary: $(BIN_DIR)/myreviser$(BIN_EXT)"
 

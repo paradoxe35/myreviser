@@ -1,10 +1,10 @@
-pub mod ffi_types;
 pub mod ffi_clipboard;
-pub mod ffi_simulator;
 pub mod ffi_hotkey;
+pub mod ffi_simulator;
+pub mod ffi_types;
 
-use std::os::raw::c_char;
 pub use ffi_types::*;
+use std::os::raw::c_char;
 
 /// Get the last error message
 /// Returns: C string (must be freed with myreviser_free_string) or NULL if no error

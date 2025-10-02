@@ -6,7 +6,7 @@ package input
 #cgo CFLAGS: -I${SRCDIR}/../../rust-ffi
 
 // Linux static linking
-#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm
+#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst
 
 // macOS linking (partial static, frameworks required)
 #cgo darwin LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a

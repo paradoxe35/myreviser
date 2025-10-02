@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -67,9 +68,7 @@ func main() {
 	defer hotkeyMgr.Close()
 
 	// Register a test hotkey
-	triggered := false
 	err = hotkeyMgr.RegisterHotkey("ctrl+alt+t", "test", func() {
-		triggered = true
 		fmt.Println("✓ Hotkey triggered!")
 	})
 

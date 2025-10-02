@@ -17,6 +17,7 @@ on:
 
 env:
   GO_VERSION: "1.24"
+  RUST_VERSION: "stable"
 
 jobs:
   build-linux:
@@ -33,6 +34,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -42,14 +50,17 @@ jobs:
             libx11-dev \
             libxkbfile-dev \
             libxtst-dev \
+            libxdo-dev \
+            libxi-dev \
             libpng-dev \
             libjpeg-dev \
             libxinerama-dev \
             libxcb-xkb-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
             libxkbcommon-x11-dev \
             libxcursor-dev \
             libxrandr-dev \
-            libxi-dev \
             libxrender-dev \
             libxfixes-dev \
             libxxf86vm-dev \
@@ -61,27 +72,27 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Build Rust FFI library
+        run: |
+          cd rust-ffi
+          cargo build --release
+          cd ..
+          mkdir -p lib
+          cp rust-ffi/target/release/libmyreviser_ffi.a lib/
+
       - name: Bundle resources
         run: |
           if [ -f assets/icon.png ]; then
             fyne bundle -o bundled.go assets/icon.png
           fi
 
-      - name: Build application
+      - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-linux-${{ matrix.arch }}
-
-      - name: Package with Fyne
-        env:
-          CGO_ENABLED: 1
-        run: |
-          if [ -f assets/icon.png ]; then
-            fyne package -os linux -icon assets/icon.png -name MyReviser -release
-          fi
+          fyne build -release -o myreviser-linux-${{ matrix.arch }}
 
       - name: Create portable archive
         run: |
@@ -144,10 +155,11 @@ jobs:
           Version: ${GITHUB_REF_NAME#v}
           Architecture: ${{ matrix.arch }}
           Maintainer: Paradoxe Ng <contact@pngwasi.me>
-          Description: AI-powered text revision tool
+          Description: AI-powered text revision tool with Rust FFI
            MyReviser is a system tray application that provides global hotkeys
            for instant text enhancement using AI providers.
-          Depends: libgl1-mesa-glx, libx11-6, libxcursor1, libxrandr2
+           Built with Go and Rust FFI for optimal performance.
+          Depends: libgl1-mesa-glx, libx11-6, libxcursor1, libxrandr2, libxtst6, xdotool
           EOF
 
           # Create desktop entry
@@ -204,6 +216,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
       - name: Install MinGW
         run: |
           choco install mingw -y
@@ -214,31 +233,28 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Build Rust FFI library
+        run: |
+          cd rust-ffi
+          cargo build --release
+          cd ..
+          New-Item -ItemType Directory -Force -Path lib
+          Copy-Item rust-ffi\target\release\myreviser_ffi.lib lib\ -ErrorAction SilentlyContinue
+          Copy-Item rust-ffi\target\release\libmyreviser_ffi.a lib\ -ErrorAction SilentlyContinue
+
       - name: Bundle resources
         run: |
           if (Test-Path "assets/icon.png") {
             fyne bundle -o bundled.go assets/icon.png
           }
 
-      - name: Build application
+      - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          $buildTime = Get-Date -Format "yyyy-MM-dd_HH:mm:ss"
-          go build -ldflags "-s -w -H=windowsgui -X main.Version=$version -X main.BuildTime=$buildTime" -o myreviser-windows-${{ matrix.arch }}.exe
-
-      - name: Package with Fyne
-        env:
-          CGO_ENABLED: 1
-        run: |
-          if (Test-Path "assets/icon.ico") {
-            fyne package -os windows -icon assets/icon.ico -name MyReviser -release
-          } elseif (Test-Path "assets/icon.png") {
-            fyne package -os windows -icon assets/icon.png -name MyReviser -release
-          }
+          fyne build -release -o myreviser-windows-${{ matrix.arch }}.exe
 
       - name: Create portable ZIP
         run: |
@@ -343,11 +359,37 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Add Rust target for architecture
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            rustup target add aarch64-apple-darwin
+          else
+            rustup target add x86_64-apple-darwin
+          fi
+
       - name: Install Fyne
         run: go install fyne.io/fyne/v2/cmd/fyne@latest
 
       - name: Install dependencies
         run: go mod download
+
+      - name: Build Rust FFI library
+        run: |
+          cd rust-ffi
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cargo build --release --target aarch64-apple-darwin
+            cp target/aarch64-apple-darwin/release/libmyreviser_ffi.a ../lib/
+          else
+            cargo build --release --target x86_64-apple-darwin
+            cp target/x86_64-apple-darwin/release/libmyreviser_ffi.a ../lib/
+          fi
 
       - name: Bundle resources
         run: |
@@ -355,21 +397,13 @@ jobs:
             fyne bundle -o bundled.go assets/icon.png
           fi
 
-      - name: Build application
+      - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME#v} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o myreviser-darwin-${{ matrix.arch }}
-
-      - name: Package with Fyne
-        env:
-          CGO_ENABLED: 1
-        run: |
-          if [ -f assets/icon.png ]; then
-            fyne package -os darwin -icon assets/icon.png -name MyReviser -release
-          fi
+          fyne build -release -o myreviser-darwin-${{ matrix.arch }}
 
       - name: Create .app bundle manually if needed
         run: |
@@ -498,7 +532,13 @@ jobs:
         with:
           files: release/*
           body: |
-            ## MyReviser ${{ github.ref_name }}
+            ## MyReviser ${{ github.ref_name }} - Now with Rust FFI! 🚀
+
+            ### ⚡ What's New in This Release
+            - **Rust FFI Integration**: Replaced problematic Go libraries with high-performance Rust FFI
+            - **Better Performance**: Faster clipboard and hotkey operations
+            - **More Reliable**: Fewer crashes, better cross-platform support
+            - **Static Linking**: All Rust code embedded in the binary
 
             ### 📦 Downloads
 
@@ -514,7 +554,7 @@ jobs:
             #### Linux
             - **Portable (x64)**: `myreviser-linux-amd64.tar.gz` - Extract and run
             - **AppImage (x64)**: `myreviser-linux-amd64.AppImage` - Universal Linux package
-            - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `dpkg -i`
+            - **Debian/Ubuntu (x64)**: `myreviser-linux-amd64.deb` - Install with `sudo dpkg -i`
             - **ARM64**: `myreviser-linux-arm64.tar.gz` / `myreviser-linux-arm64.deb`
 
             ### 🔐 Verify Downloads
@@ -523,13 +563,13 @@ jobs:
             ### 📋 System Requirements
 
             **All Platforms**:
-            - Go 1.21+ runtime dependencies
             - System tray support
 
             **Linux**:
             - X11 or Wayland
             - OpenGL support (libgl1-mesa-glx)
-            - GTK3 (optional for better theme integration)
+            - xdotool (for key simulation) - `sudo apt install xdotool`
+            - libX11, libXtst, libXi (usually pre-installed)
 
             **macOS**:
             - macOS 10.13+
@@ -557,13 +597,20 @@ jobs:
             - Global hotkeys for instant text enhancement
             - System tray integration
             - Cross-platform support
-            - Lightweight and fast (native Go with Fyne UI)
+            - High-performance Rust FFI for system operations
+            - Lightweight and fast (native Go + Rust)
+
+            ### 🔧 Technical Details
+            - **Languages**: Go 1.24 + Rust (FFI)
+            - **GUI Framework**: Fyne v2.6
+            - **System Integration**: Rust FFI (rdev, arboard, enigo)
+            - **Build**: Static Rust libraries embedded in Go binary
 
             ### 📝 Changes
             See [CHANGELOG.md](CHANGELOG.md) for details.
 
             ### 🐛 Known Issues
-            - Linux: Requires X11 libraries for global hotkeys
+            - Linux: Requires X11 libraries and xdotool for global hotkeys
             - macOS: First launch requires accessibility permissions
             - Windows: May require running as administrator for some applications
 

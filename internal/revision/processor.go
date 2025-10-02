@@ -18,13 +18,13 @@ type Processor struct {
 	mu               sync.Mutex
 	config           *config.Config
 	providerFactory  *ai.ProviderFactory
-	clipboardManager *input.ClipboardManager
+	clipboardManager *input.FFIClipboardManager
 	processing       bool
 }
 
 // NewProcessor creates a new revision processor
 func NewProcessor(cfg *config.Config) (*Processor, error) {
-	clipManager, err := input.NewClipboardManager()
+	clipManager, err := input.NewFFIClipboardManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clipboard manager: %w", err)
 	}
@@ -122,12 +122,12 @@ func (p *Processor) ProcessSelectAll() error {
 	}
 
 	// Select all text
-	if err := input.SimulateSelectAll(); err != nil {
+	if err := input.FFISimulateSelectAll(); err != nil {
 		return fmt.Errorf("failed to select all: %w", err)
 	}
 
 	// Copy to clipboard
-	if err := input.SimulateCopy(); err != nil {
+	if err := input.FFISimulateCopy(); err != nil {
 		return fmt.Errorf("failed to copy: %w", err)
 	}
 
@@ -151,12 +151,12 @@ func (p *Processor) ProcessSelectAll() error {
 	}
 
 	// Select all again and paste
-	if err := input.SimulateSelectAll(); err != nil {
+	if err := input.FFISimulateSelectAll(); err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to select all for paste: %w", err)
 	}
 
-	if err := input.SimulatePaste(); err != nil {
+	if err := input.FFISimulatePaste(); err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to paste: %w", err)
 	}
@@ -269,4 +269,11 @@ func (p *Processor) IsProcessing() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.processing
+}
+
+// Close releases the processor resources
+func (p *Processor) Close() {
+	if p.clipboardManager != nil {
+		p.clipboardManager.Close()
+	}
 }
