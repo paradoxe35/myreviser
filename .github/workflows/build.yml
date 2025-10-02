@@ -109,25 +109,25 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          # fyne package creates myreviser.tar.xz for Linux
-          fyne package --icon assets/icon.png --name myreviser --release
+          # fyne package creates MyReviser.tar.xz for Linux
+          fyne package --icon assets/icon.png --name MyReviser --release
 
-          # Find and extract the tar archive (could be .tar.xz or .tar.gz)
-          TAR_FILE=$(ls myreviser.tar.* 2>/dev/null | head -n 1)
-          if [ -n "$TAR_FILE" ]; then
-            echo "Extracting $TAR_FILE"
-            tar -xf "$TAR_FILE"
+          # Extract MyReviser.tar.xz
+          tar -xf MyReviser.tar.xz
 
-            # The extracted structure is usr/local/bin/myreviser
-            mv usr/local/bin/myreviser myreviser-linux-${{ matrix.arch }}
-
-            # Clean up
-            rm -rf usr "$TAR_FILE"
+          # Find the binary in usr/local/bin (module name is myreviser-go)
+          BINARY=$(find usr/local/bin -type f -executable | head -n 1)
+          if [ -n "$BINARY" ]; then
+            echo "Found binary: $BINARY"
+            mv "$BINARY" myreviser-linux-${{ matrix.arch }}
           else
-            echo "Error: No tar archive found"
-            ls -la
+            echo "Error: No binary found"
+            ls -la usr/local/bin/
             exit 1
           fi
+
+          # Clean up
+          rm -rf usr MyReviser.tar.xz
 
       - name: Create portable archive
         run: |
@@ -321,10 +321,10 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne package --icon assets/icon.ico --name myreviser --release
-          # fyne package creates myreviser.exe, rename it
-          if (Test-Path "myreviser.exe") {
-            Move-Item myreviser.exe myreviser-windows-${{ matrix.arch }}.exe
+          fyne package --icon assets/icon.ico --name MyReviser --release
+          # fyne package creates MyReviser.exe, rename it
+          if (Test-Path "MyReviser.exe") {
+            Move-Item MyReviser.exe myreviser-windows-${{ matrix.arch }}.exe
           }
 
       - name: Create portable ZIP
