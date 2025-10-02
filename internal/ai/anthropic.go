@@ -129,10 +129,10 @@ func (p *AnthropicProvider) ReviseText(ctx context.Context, text, systemPrompt s
 // ValidateConfig validates the provider configuration
 func (p *AnthropicProvider) ValidateConfig() error {
 	if p.APIKey == "" {
-		return fmt.Errorf("Anthropic API key is required")
+		return fmt.Errorf("anthropic API key is required")
 	}
 	if p.BaseURL == "" {
-		return fmt.Errorf("Anthropic base URL is required")
+		return fmt.Errorf("anthropic base URL is required")
 	}
 	return nil
 }

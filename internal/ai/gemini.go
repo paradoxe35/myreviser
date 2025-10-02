@@ -34,9 +34,18 @@ func NewGeminiProvider(apiKey, baseURL, model string) *GeminiProvider {
 	}
 }
 
+type ThinkingConfig struct {
+	ThinkingBudget int `json:"thinkingBudget"`
+}
+
+type GenerationConfig struct {
+	ThinkingConfig ThinkingConfig `json:"thinkingConfig"`
+}
+
 // GeminiRequest represents the request structure for Gemini API
 type GeminiRequest struct {
-	Contents []GeminiContent `json:"contents"`
+	Contents         []GeminiContent  `json:"contents"`
+	GenerationConfig GenerationConfig `json:"generationConfig"`
 }
 
 // GeminiContent represents content in the Gemini API
@@ -81,6 +90,11 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 
 	requestBody := GeminiRequest{
 		Contents: contents,
+		GenerationConfig: GenerationConfig{
+			ThinkingConfig: ThinkingConfig{
+				ThinkingBudget: 0,
+			},
+		},
 	}
 
 	jsonData, err := json.Marshal(requestBody)
@@ -88,7 +102,7 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", p.BaseURL, p.Model, p.APIKey)
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent", p.BaseURL, p.Model)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -96,6 +110,7 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", p.APIKey)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -133,10 +148,10 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 // ValidateConfig validates the provider configuration
 func (p *GeminiProvider) ValidateConfig() error {
 	if p.APIKey == "" {
-		return fmt.Errorf("Gemini API key is required")
+		return fmt.Errorf("gemini API key is required")
 	}
 	if p.BaseURL == "" {
-		return fmt.Errorf("Gemini base URL is required")
+		return fmt.Errorf("gemini base URL is required")
 	}
 	return nil
 }
