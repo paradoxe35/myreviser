@@ -12,8 +12,6 @@
 
 typedef void *ClipboardHandle;
 
-typedef void *SimulatorHandle;
-
 /**
  * Opaque pointer types for safe cross-FFI boundary object passing
  */
@@ -24,6 +22,8 @@ typedef void *HotkeyManagerHandle;
  * The callback receives the action string that was registered
  */
 typedef void (*HotkeyCallback)(const char*);
+
+typedef void *SimulatorHandle;
 
 /**
  * Get the last error message
@@ -73,35 +73,6 @@ int myreviser_clipboard_restore(ClipboardHandle handle);
 void myreviser_clipboard_free(ClipboardHandle handle);
 
 /**
- * Create a new key simulator
- * Returns: Opaque handle to key simulator or NULL on failure
- */
-SimulatorHandle myreviser_simulator_new(void);
-
-/**
- * Simulate select all (Ctrl+A or Cmd+A on macOS)
- * Returns: 0 on success, error code on failure
- */
-int myreviser_simulate_select_all(SimulatorHandle handle);
-
-/**
- * Simulate copy (Ctrl+C or Cmd+C on macOS)
- * Returns: 0 on success, error code on failure
- */
-int myreviser_simulate_copy(SimulatorHandle handle);
-
-/**
- * Simulate paste (Ctrl+V or Cmd+V on macOS)
- * Returns: 0 on success, error code on failure
- */
-int myreviser_simulate_paste(SimulatorHandle handle);
-
-/**
- * Free key simulator resources
- */
-void myreviser_simulator_free(SimulatorHandle handle);
-
-/**
  * Create a new hotkey manager
  * Returns: Opaque handle to hotkey manager or NULL on failure
  */
@@ -135,5 +106,34 @@ int myreviser_hotkey_stop(HotkeyManagerHandle handle);
  * Free hotkey manager resources
  */
 void myreviser_hotkey_manager_free(HotkeyManagerHandle handle);
+
+/**
+ * Create a new key simulator
+ * Returns: Opaque handle to key simulator or NULL on failure
+ */
+SimulatorHandle myreviser_simulator_new(void);
+
+/**
+ * Simulate select all (Ctrl+A or Cmd+A on macOS)
+ * Returns: 0 on success, error code on failure
+ */
+int myreviser_simulate_select_all(SimulatorHandle handle);
+
+/**
+ * Simulate copy (Ctrl+C or Cmd+C on macOS)
+ * Returns: 0 on success, error code on failure
+ */
+int myreviser_simulate_copy(SimulatorHandle handle);
+
+/**
+ * Simulate paste (Ctrl+V or Cmd+V on macOS)
+ * Returns: 0 on success, error code on failure
+ */
+int myreviser_simulate_paste(SimulatorHandle handle);
+
+/**
+ * Free key simulator resources
+ */
+void myreviser_simulator_free(SimulatorHandle handle);
 
 #endif  /* MYREVISER_FFI_H */

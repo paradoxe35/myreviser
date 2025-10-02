@@ -118,9 +118,13 @@ impl SimpleHotkeyManager {
                                         &key_str,
                                     ) {
                                         // Trigger callback
+                                        // SAFETY: We leak the CString and let the Go side free it
+                                        // to ensure the pointer remains valid during the callback
                                         let action_cstr =
                                             std::ffi::CString::new(binding.action.clone()).unwrap();
-                                        (binding.callback)(action_cstr.as_ptr());
+                                        let action_ptr = action_cstr.into_raw();
+                                        (binding.callback)(action_ptr);
+                                        // Go side MUST call myreviser_free_string on this pointer
                                     }
                                 }
                             }

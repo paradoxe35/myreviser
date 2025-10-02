@@ -206,8 +206,13 @@ func (h *FFIHotkeyManager) Enable() {
 // hotkeyCallbackGateway is called from Rust when a hotkey is triggered
 // This function must be exported for C
 //
+// IMPORTANT: The action string is allocated by Rust and must be freed by us
+//
 //export hotkeyCallbackGateway
 func hotkeyCallbackGateway(action *C.char) {
+	// Free the Rust-allocated string after we're done with it
+	defer C.myreviser_free_string(action)
+
 	globalFFIMu.Lock()
 	manager := globalFFIHotkeyManager
 	globalFFIMu.Unlock()
@@ -217,6 +222,7 @@ func hotkeyCallbackGateway(action *C.char) {
 		return
 	}
 
+	// Copy the string immediately before Rust potentially frees it
 	actionStr := C.GoString(action)
 
 	manager.mu.RLock()
