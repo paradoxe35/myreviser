@@ -8,7 +8,18 @@ func checkAccessibilityPermissions() bool {
 	return true
 }
 
+// checkInputMonitoringPermissions is a no-op on non-macOS platforms
+func checkInputMonitoringPermissions() bool {
+	// Always return true on Linux/Windows (no permission prompt needed)
+	return true
+}
+
 // openAccessibilityPreferences is a no-op on non-macOS platforms
 func openAccessibilityPreferences() {
+	// No-op on Linux/Windows
+}
+
+// openInputMonitoringPreferences is a no-op on non-macOS platforms
+func openInputMonitoringPreferences() {
 	// No-op on Linux/Windows
 }

@@ -221,43 +221,57 @@ func (h *FFIHotkeyManager) Enable() {
 //
 //export hotkeyCallbackGateway
 func hotkeyCallbackGateway(action *C.char) {
-	// Free the Rust-allocated string after we're done with it
-	defer C.myreviser_free_string(action)
+	// CRITICAL: This function is called from a Rust thread (rdev listener thread)
+	// We need to handle this carefully to avoid crashes
 
+	// First, safely copy the string and free the Rust allocation
+	// Do this BEFORE any other operations to minimize FFI calls
+	var actionStr string
+	if action != nil {
+		actionStr = C.GoString(action)
+		C.myreviser_free_string(action)
+	} else {
+		return
+	}
+
+	// Get manager reference safely
 	globalFFIMu.Lock()
 	manager := globalFFIHotkeyManager
 	globalFFIMu.Unlock()
 
 	if manager == nil {
-		logger.Warn("FFI: Hotkey triggered but no global manager set")
 		return
 	}
-
-	// Copy the string immediately before Rust potentially frees it
-	actionStr := C.GoString(action)
 
 	// Check disabled state and debounce window atomically
 	manager.mu.Lock()
 	if manager.disabled {
 		manager.mu.Unlock()
-		logger.Debug("FFI: Hotkey ignored (disabled)", "action", actionStr)
-		return
+		return // Silently ignore when disabled (during capture)
 	}
 	if t, ok := manager.lastTrigger[actionStr]; ok {
 		if time.Since(t) < 500*time.Millisecond {
 			manager.mu.Unlock()
-			logger.Debug("FFI: Hotkey ignored (debounced)", "action", actionStr)
-			return
+			return // Silently ignore debounced events
 		}
 	}
 	manager.lastTrigger[actionStr] = time.Now()
 	handler, exists := manager.handlers[actionStr]
 	manager.mu.Unlock()
 
-	if exists && handler != nil {
-		logger.Info("FFI: Hotkey triggered, executing handler", "action", actionStr)
-		go handler() // Run in goroutine to avoid blocking Rust
-	} else {
-		logger.Warn("FFI: No handler for action", "action", actionStr)
+	if !exists || handler == nil {
+		return // Silently ignore unknown actions
 	}
+
+	// Execute handler in a goroutine to avoid blocking Rust thread
+	// CRITICAL: Wrap in recover to catch any panics and prevent app crash
+	// This is essential because we're being called from a Rust thread
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("FFI: Panic in hotkey handler", "action", actionStr, "panic", r)
+			}
+		}()
+		handler()
+	}()
 }
