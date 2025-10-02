@@ -172,13 +172,15 @@ jobs:
           # Create AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
 
-          # Find and rename the generated AppImage
-          APPIMAGE_FILE=$(find . -maxdepth 1 -name "*.AppImage" -type f | head -n 1)
+          # Find and rename the generated AppImage (exclude linuxdeploy itself)
+          APPIMAGE_FILE=$(find . -maxdepth 1 -name "*.AppImage" -type f ! -name "linuxdeploy-*" | head -n 1)
           if [ -n "$APPIMAGE_FILE" ]; then
+            echo "Found AppImage: $APPIMAGE_FILE"
             mv "$APPIMAGE_FILE" myreviser-linux-${{ matrix.arch }}.AppImage
           else
             echo "Error: AppImage file not found"
-            ls -la
+            echo "Available files:"
+            ls -la *.AppImage 2>/dev/null || echo "No AppImage files found"
             exit 1
           fi
 
