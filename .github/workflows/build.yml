@@ -245,6 +245,16 @@ jobs:
            License: MIT
           EOF
 
+          # Copy icon if exists
+          if [ -f assets/icon.png ]; then
+            mkdir -p dist/deb/usr/share/icons/hicolor/256x256/apps
+            cp assets/icon.png dist/deb/usr/share/icons/hicolor/256x256/apps/myreviser.png
+
+            # Also copy to pixmaps as fallback
+            mkdir -p dist/deb/usr/share/pixmaps
+            cp assets/icon.png dist/deb/usr/share/pixmaps/myreviser.png
+          fi
+
           # Create desktop entry
           cat > dist/deb/usr/share/applications/myreviser.desktop <<EOF
           [Desktop Entry]
@@ -256,12 +266,8 @@ jobs:
           Type=Application
           Categories=Utility;Office;
           StartupNotify=false
+          StartupWMClass=MyReviser
           EOF
-
-          # Copy icon if exists
-          if [ -f assets/icon.png ]; then
-            cp assets/icon.png dist/deb/usr/share/icons/hicolor/256x256/apps/myreviser.png
-          fi
 
           # Build deb package
           dpkg-deb --build dist/deb myreviser-linux-${{ matrix.arch }}.deb
@@ -542,15 +548,12 @@ jobs:
           fi
           echo "MyReviser.app created successfully"
 
-      - name: Update Info.plist for tray app
+      - name: Verify Info.plist
         run: |
-          # Add LSUIElement to hide from Dock (tray-only app)
-          /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" MyReviser.app/Contents/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :LSUIElement true" MyReviser.app/Contents/Info.plist
-
-          # Verify it was added
-          echo "Info.plist updated with LSUIElement:"
-          /usr/libexec/PlistBuddy -c "Print :LSUIElement" MyReviser.app/Contents/Info.plist
+          # Verify Info.plist exists and is valid
+          echo "Info.plist contents:"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" MyReviser.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" MyReviser.app/Contents/Info.plist
 
       - name: Ad-hoc sign app bundle (inside-out approach)
         run: |
