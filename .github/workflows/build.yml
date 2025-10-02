@@ -115,7 +115,7 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -o myreviser-linux-${{ matrix.arch }}
+          fyne build -release -o myreviser-linux-${{ matrix.arch }}
 
       - name: Create portable archive
         run: |
@@ -181,10 +181,14 @@ jobs:
           cp myreviser-linux-${{ matrix.arch }} dist/deb/usr/local/bin/myreviser
           chmod +x dist/deb/usr/local/bin/myreviser
 
+          # Sanitize version for Debian (replace invalid chars with -)
+          DEB_VERSION=$(echo "${GITHUB_REF_NAME#v}" | sed 's/[^0-9a-zA-Z.]/-/g' | sed 's/^-//' | sed 's/-$//')
+          [ -z "$DEB_VERSION" ] && DEB_VERSION="0.0.0-dev"
+
           # Create control file
           cat > dist/deb/DEBIAN/control <<EOF
           Package: myreviser
-          Version: ${GITHUB_REF_NAME#v}
+          Version: $DEB_VERSION
           Architecture: ${{ matrix.arch }}
           Maintainer: Paradoxe Ng <contact@pngwasi.me>
           Description: AI-powered text revision tool with Rust FFI
@@ -311,7 +315,7 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -o myreviser-windows-${{ matrix.arch }}.exe
+          fyne build -release -o myreviser-windows-${{ matrix.arch }}.exe
 
       - name: Create portable ZIP
         run: |
@@ -329,10 +333,14 @@ jobs:
           choco install nsis -y
           $env:Path += ";C:\Program Files (x86)\NSIS"
 
+          # Sanitize version for Windows installer
+          $VERSION = "${{ github.ref_name }}" -replace '^v','' -replace '[^0-9a-zA-Z.]','-'
+          if ([string]::IsNullOrEmpty($VERSION)) { $VERSION = "0.0.0-dev" }
+
           # Create NSIS script
           @"
           !define PRODUCT_NAME "MyReviser"
-          !define PRODUCT_VERSION "${{ github.ref_name }}"
+          !define PRODUCT_VERSION "$VERSION"
           !define PRODUCT_PUBLISHER "Paradoxe Ng"
           !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser-go"
 
@@ -462,6 +470,7 @@ jobs:
 
       - name: Build Rust FFI library
         run: |
+          mkdir -p lib
           cd rust-ffi
           if [ "${{ matrix.arch }}" = "arm64" ]; then
             cargo build --release --target aarch64-apple-darwin
@@ -480,61 +489,21 @@ jobs:
       - name: Build application with Fyne
         env:
           CGO_ENABLED: 1
-          GOOS: darwin
-          GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -o myreviser-darwin-${{ matrix.arch }}
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            fyne package --target darwin/arm64 --name MyReviser --app-id me.pngwasi.myreviser --release
+          else
+            fyne package --target darwin/amd64 --name MyReviser --app-id me.pngwasi.myreviser --release
+          fi
 
-      - name: Create .app bundle manually if needed
+      - name: Verify .app bundle created
         run: |
           if [ ! -d "MyReviser.app" ]; then
-            mkdir -p MyReviser.app/Contents/MacOS
-            mkdir -p MyReviser.app/Contents/Resources
-
-            # Copy binary
-            cp myreviser-darwin-${{ matrix.arch }} MyReviser.app/Contents/MacOS/myreviser
-            chmod +x MyReviser.app/Contents/MacOS/myreviser
-
-            # Create Info.plist
-            cat > MyReviser.app/Contents/Info.plist <<EOF
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-              <key>CFBundleExecutable</key>
-              <string>myreviser</string>
-              <key>CFBundleIdentifier</key>
-              <string>me.pngwasi.myreviser</string>
-              <key>CFBundleName</key>
-              <string>MyReviser</string>
-              <key>CFBundleDisplayName</key>
-              <string>MyReviser</string>
-              <key>CFBundleVersion</key>
-              <string>${GITHUB_REF_NAME#v}</string>
-              <key>CFBundleShortVersionString</key>
-              <string>${GITHUB_REF_NAME#v}</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>10.13</string>
-              <key>LSUIElement</key>
-              <true/>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-              <key>NSAppleEventsUsageDescription</key>
-              <string>MyReviser needs automation access for text revision</string>
-              <key>NSAccessibilityUsageDescription</key>
-              <string>MyReviser needs accessibility access for global hotkeys</string>
-            </dict>
-            </plist>
-            EOF
-
-            # Copy icon if exists
-            if [ -f assets/icon.png ]; then
-              cp assets/icon.png MyReviser.app/Contents/Resources/
-            fi
-            if [ -f assets/icon.icns ]; then
-              cp assets/icon.icns MyReviser.app/Contents/Resources/icon.icns
-            fi
+            echo "Error: MyReviser.app was not created"
+            ls -la
+            exit 1
           fi
+          echo "MyReviser.app created successfully"
 
       - name: Sign app bundle (if certificates available)
         if: env.MACOS_CERTIFICATE != ''
@@ -554,8 +523,8 @@ jobs:
           # Install create-dmg
           brew install create-dmg || true
 
-          # Create DMG
-          create-dmg \
+          # Create DMG - allow failure if create-dmg has issues
+          if create-dmg \
             --volname "MyReviser" \
             --window-pos 200 120 \
             --window-size 600 400 \
@@ -565,7 +534,11 @@ jobs:
             --app-drop-link 425 120 \
             --no-internet-enable \
             "myreviser-darwin-${{ matrix.arch }}.dmg" \
-            "MyReviser.app" || true
+            "MyReviser.app"; then
+            echo "DMG created successfully"
+          else
+            echo "Warning: DMG creation failed, but ZIP archive is available"
+          fi
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
