@@ -15,6 +15,7 @@ type Config struct {
 	Hotkeys    HotkeyConfig     `json:"hotkeys"`
 	Revision   RevisionConfig   `json:"revision"`
 	Appearance AppearanceConfig `json:"appearance"`
+	Meta       MetaConfig       `json:"meta"`
 }
 
 type ProviderSettings struct {
@@ -42,6 +43,10 @@ type RevisionConfig struct {
 type AppearanceConfig struct {
 	Theme          string `json:"theme"` // "auto" | "light" | "dark"
 	StartMinimized bool   `json:"start_minimized"`
+}
+
+type MetaConfig struct {
+	FirstRun bool `json:"first_run"`
 }
 
 var (
@@ -80,6 +85,7 @@ func Default() *Config {
 		Hotkeys:    GetPlatformHotkeys(),
 		Revision:   GetDefaultRevision(),
 		Appearance: GetDefaultAppearance(),
+		Meta:       MetaConfig{FirstRun: true},
 	}
 }
 

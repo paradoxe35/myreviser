@@ -80,8 +80,8 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHot
 	content := mw.createContent()
 	window.SetContent(content)
 
-	// Hide window if start minimized
-	if cfg.Appearance.StartMinimized {
+	// Hide window if start minimized and not first run
+	if cfg.Appearance.StartMinimized && !cfg.Meta.FirstRun {
 		window.Hide()
 	}
 

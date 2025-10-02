@@ -164,9 +164,17 @@ func (a *Application) Start() error {
 
 	logger.Info("Application started successfully")
 
-	// Show window if not set to start minimized
-	if !a.config.Appearance.StartMinimized {
+	// Show window if first run, or if not set to start minimized
+	if a.config.Meta.FirstRun || !a.config.Appearance.StartMinimized {
 		a.mainWindow.Show()
+		a.mainWindow.RequestFocus()
+		// Mark first run complete and persist
+		if a.config.Meta.FirstRun {
+			a.config.Meta.FirstRun = false
+			if err := a.config.Save(); err != nil {
+				logger.Error("Failed to persist first-run flag", "error", err)
+			}
+		}
 	}
 
 	// Run the application
