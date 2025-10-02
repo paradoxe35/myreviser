@@ -3,7 +3,7 @@ package ui
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 // SetupSystemTray sets up the system tray icon and menu

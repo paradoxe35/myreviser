@@ -1,6 +1,6 @@
 # MyReviser
 
-[![Build and Release](https://github.com/paradoxe35/myreviser-go/actions/workflows/build.yml/badge.svg)](https://github.com/paradoxe35/myreviser-go/actions/workflows/build.yml)
+[![Build and Release](https://github.com/paradoxe35/myreviser/actions/workflows/build.yml/badge.svg)](https://github.com/paradoxe35/myreviser/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.24%2B-blue)](https://golang.org/dl/)
 
@@ -20,7 +20,7 @@ AI-powered text revision tool with global hotkeys for instant text enhancement a
 
 ### Pre-built Binaries
 
-Download the latest release for your platform from the [Releases page](https://github.com/paradoxe35/myreviser-go/releases).
+Download the latest release for your platform from the [Releases page](https://github.com/paradoxe35/myreviser/releases).
 
 #### Windows
 
@@ -100,7 +100,7 @@ chmod +x myreviser
 **Clone and Build:**
 
 ```bash
-git clone https://github.com/paradoxe35/myreviser-go.git
+git clone https://github.com/paradoxe35/myreviser.git
 cd myreviser-go
 make build
 ```
@@ -205,22 +205,6 @@ make run
 make test
 ```
 
-### Project Structure
-
-```
-myreviser-go/
-├── main.go              # Application entry point
-├── internal/
-│   ├── ai/             # AI provider implementations
-│   ├── config/         # Configuration management
-│   ├── input/          # Hotkey and clipboard handling
-│   ├── instance/       # Single instance management
-│   ├── logger/         # Logging system
-│   └── revision/       # Text processing logic
-├── ui/                 # Fyne UI components
-└── assets/             # Icons and resources
-```
-
 ## Security & Privacy
 
 - **API Keys**: Stored encrypted using AES-256-GCM
@@ -269,12 +253,6 @@ myreviser-go/
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -289,9 +267,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Built with [Fyne](https://fyne.io/) - Cross-platform GUI framework for Go
-- Global hotkeys via [golang.design/x/hotkey](https://golang.design/x/hotkey)
-- Clipboard operations via [golang.design/x/clipboard](https://golang.design/x/clipboard)
-- Key simulation via [robotgo](https://github.com/go-vgo/robotgo)
 
 ## System Requirements
 

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 // RevisionTask represents a single revision task

@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/paradoxe35/myreviser-go/internal/ai"
-	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/input"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/ai"
+	"github.com/paradoxe35/myreviser/internal/config"
+	"github.com/paradoxe35/myreviser/internal/input"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 // Processor handles text revision operations

@@ -124,7 +124,7 @@ xcode-select --install
 
 **Go Dependencies (go.mod):**
 ```go
-module github.com/paradoxe35/myreviser-go
+module github.com/paradoxe35/myreviser
 
 go 1.24.0
 
@@ -355,8 +355,8 @@ package main
 import (
     "fyne.io/fyne/v2/app"
     "fyne.io/fyne/v2/driver/desktop"
-    "github.com/paradoxe35/myreviser-go/internal/config"
-    "github.com/paradoxe35/myreviser-go/ui"
+    "github.com/paradoxe35/myreviser/internal/config"
+    "github.com/paradoxe35/myreviser/ui"
 )
 
 func main() {
@@ -1403,7 +1403,7 @@ sudo apt-get install -y \
 #### Quick Start
 ```bash
 # Clone repository
-git clone https://github.com/paradoxe35/myreviser-go.git
+git clone https://github.com/paradoxe35/myreviser.git
 cd myreviser-go/fyne
 
 # Install dependencies

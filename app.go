@@ -5,11 +5,11 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/paradoxe35/myreviser-go/internal/config"
-	"github.com/paradoxe35/myreviser-go/internal/input"
-	"github.com/paradoxe35/myreviser-go/internal/logger"
-	"github.com/paradoxe35/myreviser-go/internal/revision"
-	"github.com/paradoxe35/myreviser-go/ui"
+	"github.com/paradoxe35/myreviser/internal/config"
+	"github.com/paradoxe35/myreviser/internal/input"
+	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/revision"
+	"github.com/paradoxe35/myreviser/ui"
 )
 
 // Application represents the main application

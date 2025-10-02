@@ -31,7 +31,7 @@ import (
 
 	"unsafe"
 
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 // FFIHotkeyManager wraps the Rust FFI hotkey manager

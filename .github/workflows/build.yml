@@ -352,7 +352,7 @@ jobs:
           !define PRODUCT_NAME "MyReviser"
           !define PRODUCT_VERSION "$VERSION"
           !define PRODUCT_PUBLISHER "Paradoxe Ng"
-          !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser-go"
+          !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser"
 
           Name "`${PRODUCT_NAME}"
           OutFile "myreviser-windows-${{ matrix.arch }}-installer.exe"
@@ -668,7 +668,7 @@ jobs:
             - Windows: May require running as administrator for some applications
 
             ### 📚 Documentation
-            Visit our [GitHub repository](https://github.com/paradoxe35/myreviser-go) for full documentation.
+            Visit our [GitHub repository](https://github.com/paradoxe35/myreviser) for full documentation.
           draft: false
           prerelease: false
           generate_release_notes: true

@@ -23,7 +23,7 @@ import "C"
 import (
 	"fmt"
 
-	"github.com/paradoxe35/myreviser-go/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
 // FFIKeySimulator wraps the Rust FFI key simulator

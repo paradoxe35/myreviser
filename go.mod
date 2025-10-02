@@ -1,4 +1,4 @@
-module github.com/paradoxe35/myreviser-go
+module github.com/paradoxe35/myreviser
 
 go 1.24.0
 
