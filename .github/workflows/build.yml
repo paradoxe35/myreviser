@@ -146,18 +146,24 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
 
-          # Create AppDir structure
+          # Create AppDir structure with proper hierarchy
           mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          # Copy binary
           cp myreviser-linux-${{ matrix.arch }} AppDir/usr/bin/myreviser
           chmod +x AppDir/usr/bin/myreviser
 
-          # Copy icon
+          # Copy icon to proper location
           if [ -f assets/icon.png ]; then
+            cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/myreviser.png
+            # Also copy to root for compatibility
             cp assets/icon.png AppDir/myreviser.png
           fi
 
-          # Create desktop entry
-          cat > AppDir/myreviser.desktop <<EOF
+          # Create desktop entry in proper location
+          cat > AppDir/usr/share/applications/myreviser.desktop <<'EOF'
           [Desktop Entry]
           Name=MyReviser
           Comment=AI-powered text revision tool
@@ -165,18 +171,22 @@ jobs:
           Icon=myreviser
           Terminal=false
           Type=Application
-          Categories=Utility;TextEditor;
-          StartupNotify=true
+          Categories=Utility;Office;
+          StartupNotify=false
           EOF
 
-          # Create AppImage
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+          # Also copy desktop file to root (required by linuxdeploy)
+          cp AppDir/usr/share/applications/myreviser.desktop AppDir/myreviser.desktop
+
+          # Create AppImage with proper desktop integration
+          ARCH=x86_64 ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
 
           # Find and rename the generated AppImage (exclude linuxdeploy itself)
           APPIMAGE_FILE=$(find . -maxdepth 1 -name "*.AppImage" -type f ! -name "linuxdeploy-*" | head -n 1)
           if [ -n "$APPIMAGE_FILE" ]; then
             echo "Found AppImage: $APPIMAGE_FILE"
             mv "$APPIMAGE_FILE" myreviser-linux-${{ matrix.arch }}.AppImage
+            chmod +x myreviser-linux-${{ matrix.arch }}.AppImage
           else
             echo "Error: AppImage file not found"
             echo "Available files:"
@@ -218,7 +228,7 @@ jobs:
           Architecture: ${{ matrix.arch }}
           Maintainer: Paradoxe Ng <contact@pngwasi.me>
           Homepage: https://github.com/paradoxe35/myreviser
-          Depends: libc6, libgl1, libx11-6, libxinerama1, libxtst6
+          Depends: libc6, libgl1, libx11-6, libxinerama1, libxtst6, libxdo3
           Description: AI-powered text revision tool with Rust FFI
            MyReviser is a system tray application that provides global hotkeys
            for instant text enhancement using AI providers (OpenAI, Claude, Gemini).
@@ -244,8 +254,8 @@ jobs:
           Icon=myreviser
           Terminal=false
           Type=Application
-          Categories=Utility;TextEditor;
-          StartupNotify=true
+          Categories=Utility;Office;
+          StartupNotify=false
           EOF
 
           # Copy icon if exists
