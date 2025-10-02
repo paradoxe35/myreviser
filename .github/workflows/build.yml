@@ -92,7 +92,7 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -o myreviser-linux-${{ matrix.arch }}
+          fyne build -o myreviser-linux-${{ matrix.arch }}
 
       - name: Create portable archive
         run: |
@@ -254,7 +254,7 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -o myreviser-windows-${{ matrix.arch }}.exe
+          fyne build -o myreviser-windows-${{ matrix.arch }}.exe
 
       - name: Create portable ZIP
         run: |
@@ -403,7 +403,7 @@ jobs:
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne build -release -o myreviser-darwin-${{ matrix.arch }}
+          fyne build -o myreviser-darwin-${{ matrix.arch }}
 
       - name: Create .app bundle manually if needed
         run: |

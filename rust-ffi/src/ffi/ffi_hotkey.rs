@@ -238,7 +238,8 @@ fn matches_binding(
     // Check modifiers
     let has_ctrl = binding_modifiers.contains(&"ctrl".to_string())
         || binding_modifiers.contains(&"control".to_string());
-    let has_alt = binding_modifiers.contains(&"alt".to_string());
+    let has_alt = binding_modifiers.contains(&"alt".to_string())
+        || binding_modifiers.contains(&"option".to_string());  // macOS uses "option"
     let has_shift = binding_modifiers.contains(&"shift".to_string());
     let has_meta = binding_modifiers.contains(&"meta".to_string())
         || binding_modifiers.contains(&"cmd".to_string())

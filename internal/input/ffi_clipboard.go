@@ -22,6 +22,7 @@ package input
 import "C"
 import (
 	"fmt"
+	"time"
 	"unsafe"
 )
 
@@ -126,8 +127,9 @@ func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
 		return "", fmt.Errorf("failed to simulate copy: %w", err)
 	}
 
-	// Wait a bit for clipboard to update
-	// time.Sleep(100 * time.Millisecond)
+	// Wait for clipboard to update after simulated Ctrl+C
+	// This prevents race condition where we read before the OS updates clipboard
+	time.Sleep(100 * time.Millisecond)
 
 	// Get the new clipboard content
 	text, err := c.GetText()
@@ -167,8 +169,9 @@ func (c *FFIClipboardManager) ReplaceSelectedText(newText string) error {
 		return fmt.Errorf("failed to simulate paste: %w", err)
 	}
 
-	// Wait a bit for paste to complete
-	// time.Sleep(100 * time.Millisecond)
+	// Wait for paste operation to complete before restoring clipboard
+	// This prevents race condition where we restore before paste finishes
+	time.Sleep(100 * time.Millisecond)
 
 	// Restore original clipboard
 	if err := c.Restore(); err != nil {
