@@ -436,7 +436,6 @@ jobs:
           InstallDirRegKey HKCU "${PRODUCT_INSTALL_REG}" "InstallDir"
           RequestExecutionLevel user
           SetCompress auto
-          SetShellVarContext current
 
           !define MUI_ABORTWARNING
           !define MUI_ICON "assets\icon.ico"
@@ -444,6 +443,10 @@ jobs:
 
           Var AutoStartCheckbox
           Var AutoStartState
+
+          Function .onInit
+            SetShellVarContext current
+          FunctionEnd
 
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
