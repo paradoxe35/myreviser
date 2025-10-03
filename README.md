@@ -8,284 +8,92 @@ AI-powered text revision tool with global hotkeys for instant text enhancement a
 
 ## Features
 
-- **Multiple AI Providers**: OpenAI, Claude (Anthropic), and Google Gemini support
-- **Global Hotkeys**: System-wide shortcuts work in any application
-- **Cross-Platform**: Native builds for Windows, macOS, and Linux
-- **System Tray**: Runs quietly in background with easy access
-- **Secure Storage**: Encrypted API key storage
-- **Multi-Language**: Works with any language supported by AI models
-- **Lightweight**: Native Go application with minimal resource usage
+- Multiple AI providers: OpenAI, Claude (Anthropic), and Google Gemini
+- Global hotkeys and system tray controls that work across Windows, macOS, and Linux
+- Secure API key storage with encrypted configuration
+- Lightweight native Go application with Rust-powered input handling
+- Configurable prompts, providers, and preferences per user profile
 
 ## Installation
 
-### Pre-built Binaries
+- Download the [latest release](https://github.com/paradoxe35/myreviser/releases/latest) for your operating system.
+- Extract or install the package that matches your platform and architecture, then run `MyReviser`.
+- On the first launch, grant the application the accessibility or input permissions prompted by your OS so hotkeys work system-wide.
 
-Download the latest release for your platform from the [Releases page](https://github.com/paradoxe35/myreviser/releases).
-
-#### Windows
-
-**Option 1: Installer (Recommended)**
-
-```bash
-# Download and run
-myreviser-windows-amd64-installer.exe
-```
-
-**Option 2: Portable**
-
-```bash
-# Extract and run
-unzip myreviser-windows-amd64-portable.zip
-myreviser.exe
-```
-
-#### macOS
-
-**Option 1: DMG (Recommended)**
-
-```bash
-# Download and install
-open myreviser-darwin-amd64.dmg  # Intel
-open myreviser-darwin-arm64.dmg  # Apple Silicon
-```
-
-**Option 2: ZIP**
-
-```bash
-# Extract and run
-unzip myreviser-darwin-amd64.zip
-open MyReviser.app
-```
-
-**Note**: On first launch, you may need to allow the app in **System Preferences → Privacy & Security → Accessibility**.
-
-#### Linux
-
-**Option 1: AppImage (Universal)**
-
-```bash
-# Download and run
-chmod +x myreviser-linux-amd64.AppImage
-./myreviser-linux-amd64.AppImage
-```
-
-**Option 2: Debian/Ubuntu Package**
-
-```bash
-# Install package
-sudo dpkg -i myreviser-linux-amd64.deb
-sudo apt-get install -f  # Install dependencies if needed
-
-# Run
-myreviser
-```
-
-**Option 3: Portable Archive**
-
-```bash
-# Extract and run
-tar -xzf myreviser-linux-amd64.tar.gz
-chmod +x myreviser
-./myreviser
-```
-
-### Build from Source
-
-**Requirements:**
-
-- Go 1.24 or later
-- CGO enabled
-- Platform-specific dependencies (see below)
-
-**Clone and Build:**
-
-```bash
-git clone https://github.com/paradoxe35/myreviser.git
-cd myreviser-go
-make build
-```
-
-**Platform-Specific Dependencies:**
-
-<details>
-<summary><b>Linux</b></summary>
-
-```bash
-sudo apt-get update && sudo apt-get install -y \
-    libgl1-mesa-dev xorg-dev \
-    libx11-dev libxtst-dev libxkbfile-dev \
-    libxinerama-dev libxcb-xkb-dev libxkbcommon-x11-dev \
-    libxcursor-dev libxrandr-dev libxi-dev
-```
-
-</details>
-
-<details>
-<summary><b>macOS</b></summary>
-
-```bash
-# Install Xcode Command Line Tools
-xcode-select --install
-```
-
-</details>
-
-<details>
-<summary><b>Windows</b></summary>
-
-- Install MinGW-w64 or Visual Studio build tools
-- CGO must be enabled
-</details>
+_For detailed build artifacts or manual installation notes, see the release description for the version you choose._
 
 ## Quick Start
 
-1. **Launch MyReviser** - The app will start minimized in your system tray
-2. **Configure Settings** - Right-click tray icon and select Settings
-3. **Select AI Provider** - Choose OpenAI, Claude, or Gemini
-4. **Enter API Key** - Your key is stored encrypted locally
-5. **Customize Hotkeys** - Click "Capture" to set your preferred shortcuts
-6. **Start Using** - Press your hotkey in any application to revise text
-
-## Default Hotkeys
-
-| Action                  | Linux/Windows             | macOS               |
-| ----------------------- | ------------------------- | ------------------- |
-| **Select All & Revise** | `Ctrl+Alt+Space`          | `Ctrl+Option+Space` |
-| **Revise Selection**    | `Ctrl+Super` / `Ctrl+Win` | `Ctrl+Cmd`          |
-
-_All hotkeys are customizable in Settings_
+1. Launch MyReviser and open the tray menu to configure your preferred AI provider and API key.
+2. Set the global hotkeys you want to use for "Revise Selection" and "Select All & Revise".
+3. Trigger a hotkey in any application—the selected text is automatically sent to the provider and replaced with the improved version.
 
 ## Configuration
 
-### Configuration File Location
+Configuration files are created automatically after the first run.
 
-- **Linux**: `~/.myreviser/config.json`
-- **macOS**: `~/.myreviser/config.json`
-- **Windows**: `%USERPROFILE%\.myreviser\config.json`
+| Platform | Path                                                  |
+| -------- | ----------------------------------------------------- |
+| Linux    | `~/.config/myreviser/config.json`                     |
+| macOS    | `~/Library/Application Support/MyReviser/config.json` |
+| Windows  | `%USERPROFILE%\.myreviser\config.json`                |
 
-### Supported AI Providers
+Custom base URLs are supported for OpenAI-compatible endpoints.
 
-| Provider   | Model Examples                                            | Base URL                                    |
-| ---------- | --------------------------------------------------------- | ------------------------------------------- |
-| **OpenAI** | `gpt-4o`, `gpt-4o-mini`                                   | `https://api.openai.com/v1`                 |
-| **Claude** | `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` | `https://api.anthropic.com`                 |
-| **Gemini** | `gemini-2.0-flash-exp`, `gemini-1.5-pro`                  | `https://generativelanguage.googleapis.com` |
+## Supported AI Providers
 
-_Custom base URLs supported for OpenAI-compatible APIs_
+| Provider | Model Examples                                            | Base URL                                    |
+| -------- | --------------------------------------------------------- | ------------------------------------------- |
+| OpenAI   | `gpt-4o`, `gpt-4o-mini`                                   | `https://api.openai.com/v1`                 |
+| Claude   | `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` | `https://api.anthropic.com`                 |
+| Gemini   | `gemini-2.0-flash-exp`, `gemini-1.5-pro`                  | `https://generativelanguage.googleapis.com` |
 
-## Usage
+OpenAI-compatible providers (e.g., OpenRouter, Together AI) can be configured by supplying their base URL and API key.
 
-### Revise All Text
+## Rust FFI Core
 
-1. Focus on any text field or document
-2. Press your "Select All & Revise" hotkey
-3. Text is automatically selected, revised, and replaced
-
-### Revise Selected Text
-
-1. Select text in any application
-2. Press your "Revise Selection" hotkey
-3. Selected text is automatically revised and replaced
+MyReviser routes global hotkeys, clipboard access, and key simulation through the Rust code in `rust-ffi/` (rdev, arboard, enigo) and exposes those capabilities to Go via CGO. This hybrid approach keeps the UI responsive while providing reliable, cross-platform system integration. For implementation notes, see `rust-ffi/README.md`.
 
 ## Development
 
-### Building
-
 ```bash
-# Build for current platform
+# Build for the current platform
 make build
 
-# Build for all platforms
+# Build release packages for all supported platforms
 make package-all
 
-# Run in development mode
+# Run the app locally
 make run
 
 # Run tests
 make test
 ```
 
-## Security & Privacy
+## Contributing
 
-- **API Keys**: Stored encrypted using AES-256-GCM
-- **No Data Collection**: Text is only sent to your configured AI provider
-- **Local Processing**: No data stored or transmitted except to AI APIs
-- **HTTPS Only**: All API communications use secure connections
+We welcome issues and pull requests. Before contributing, make sure you have:
+
+- Go 1.24 or newer with `CGO_ENABLED=1`
+- A Rust toolchain (stable) and `cargo` (the build script pulls `cbindgen` as a `[build-dependency]`, so no manual install is required)
+- `make` and the platform dependencies described in `rust-ffi/README.md`
+
+Check the `rust-ffi/` directory when working on system integrations.
 
 ## Troubleshooting
 
-<details>
-<summary><b>Application won't start</b></summary>
-
-- Check if another instance is running in system tray
-- Delete lock file: `~/.myscript/myscript.lock`
-- Check logs: `~/.myreviser/logs/`
-</details>
-
-<details>
-<summary><b>Hotkeys not working</b></summary>
-
-**Linux:**
-
-- Ensure X11 libraries are installed
-- Try running from terminal to see errors
-
-**macOS:**
-
-- Grant Accessibility permissions: System Preferences → Security & Privacy → Accessibility
-
-**Windows:**
-
-- Try running as administrator
-- Check for conflicts with other global hotkey apps
-</details>
-
-<details>
-<summary><b>API Connection Errors</b></summary>
-
-- Verify API key is correct
-- Check internet connection
-- Ensure you have API credits/quota
-- Review logs: Right-click tray icon → View Logs
-</details>
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
+- Ensure only one instance of MyReviser is running (check the system tray).
+- Review logs at `~/.myreviser/logs/` if revisions fail to send.
+- Confirm the application has accessibility/input permissions when hotkeys do not trigger.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-**Paradoxe Ng**
-
-- Email: contact@pngwasi.me
-- GitHub: [@paradoxe35](https://github.com/paradoxe35)
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Built with [Fyne](https://fyne.io/) - Cross-platform GUI framework for Go
-
-## System Requirements
-
-**Minimum:**
-
-- OS: Windows 10+, macOS 10.13+, or Linux with X11/Wayland
-- RAM: 256MB
-- Disk: 50MB free space
-- Network: Internet connection for AI API calls
-
-**Recommended:**
-
-- RAM: 512MB+
-- Modern CPU for faster processing
+Built with [Fyne](https://fyne.io/), a cross-platform GUI framework for Go.
 
 ---
 
-**Note**: This application requires API keys from your chosen AI provider. Sign up at:
-
-- [OpenAI Platform](https://platform.openai.com/)
-- [Anthropic Console](https://console.anthropic.com/)
-- [Google AI Studio](https://makersuite.google.com/)
+**Note:** You need valid API keys from your chosen AI provider. Sign up at the [OpenAI Platform](https://platform.openai.com/), [Anthropic Console](https://console.anthropic.com/), or [Google AI Studio](https://makersuite.google.com/).
