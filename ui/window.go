@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image/color"
-	"os"
 	"strconv"
-	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -19,6 +17,7 @@ import (
 	"github.com/paradoxe35/myreviser/internal/input"
 	"github.com/paradoxe35/myreviser/internal/logger"
 	"github.com/paradoxe35/myreviser/internal/permissions"
+	"github.com/paradoxe35/myreviser/internal/platform"
 )
 
 const (
@@ -729,31 +728,24 @@ func (w *MainWindow) SetShowHideCallbacks(onShow func(), onHide func()) {
 
 // restartApplication restarts the application
 func (w *MainWindow) restartApplication() {
-	logger.Info("Restarting application")
+	logger.Info("User requested application restart")
 
-	// On macOS/Unix, we'll use os.Executable to restart
-	// On Windows, this will also work
 	go func() {
-		time.Sleep(100 * time.Millisecond) // Give UI time to update
+		// Small delay to let UI update
+		time.Sleep(200 * time.Millisecond)
 
-		// Import os and syscall at the top if not already imported
-		executable, err := os.Executable()
+		// Use platform-specific restart logic
+		err := platform.RestartApplication()
 		if err != nil {
-			logger.Error("Failed to get executable path", "error", err)
+			logger.Error("Failed to restart application", "error", err)
 			return
 		}
 
-		logger.Info("Restarting from", "path", executable)
+		logger.Info("New instance started, quitting current instance")
 
-		// On Unix-like systems (macOS, Linux)
-		err = syscall.Exec(executable, []string{executable}, os.Environ())
-		if err != nil {
-			logger.Error("Failed to restart application", "error", err)
-		}
+		// Quit current instance after new one starts
+		w.app.Quit()
 	}()
-
-	// Quit current instance
-	w.app.Quit()
 }
 
 // Custom theme types to force light or dark theme
