@@ -130,9 +130,14 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
+	// Handle non-2xx status codes
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", ParseAPIError(resp.StatusCode, body, "gemini")
+	}
+
 	var response GeminiResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return "", ParseUnmarshalError(err, body, resp.StatusCode, "gemini")
 	}
 
 	if response.Error != nil {

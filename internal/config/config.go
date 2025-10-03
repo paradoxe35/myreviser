@@ -82,7 +82,7 @@ func Default() *Config {
 				},
 				"gemini": {
 					BaseURL:     "https://generativelanguage.googleapis.com",
-					Model:       "gemini-2.0-flash-exp",
+					Model:       "gemini-2.5-flash",
 					Temperature: 1.0,
 				},
 			},

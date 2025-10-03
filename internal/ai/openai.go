@@ -58,9 +58,9 @@ type OpenAIResponse struct {
 		Message OpenAIMessage `json:"message"`
 	} `json:"choices"`
 	Error *struct {
-		Message string `json:"message"`
-		Type    string `json:"type"`
-		Code    string `json:"code"`
+		Message string      `json:"message"`
+		Type    string      `json:"type"`
+		Code    interface{} `json:"code,omitempty"`
 	} `json:"error,omitempty"`
 }
 
@@ -105,9 +105,14 @@ func (p *OpenAIProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
+	// Handle non-2xx status codes
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", ParseAPIError(resp.StatusCode, body, "openai")
+	}
+
 	var response OpenAIResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return "", ParseUnmarshalError(err, body, resp.StatusCode, "openai")
 	}
 
 	if response.Error != nil {

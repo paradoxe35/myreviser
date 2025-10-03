@@ -46,7 +46,7 @@ Custom base URLs are supported for OpenAI-compatible endpoints.
 | -------- | --------------------------------------------------------- | ------------------------------------------- |
 | OpenAI   | `gpt-4o`, `gpt-4o-mini`                                   | `https://api.openai.com/v1`                 |
 | Claude   | `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` | `https://api.anthropic.com`                 |
-| Gemini   | `gemini-2.0-flash-exp`, `gemini-1.5-pro`                  | `https://generativelanguage.googleapis.com` |
+| Gemini   | `gemini-2.5-flash`, `gemini-2.5-flash-lite`               | `https://generativelanguage.googleapis.com` |
 
 OpenAI-compatible providers (e.g., OpenRouter, Together AI) can be configured by supplying their base URL and API key.
 

@@ -109,9 +109,14 @@ func (p *AnthropicProvider) ReviseText(ctx context.Context, text, systemPrompt s
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
+	// Handle non-2xx status codes
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", ParseAPIError(resp.StatusCode, body, "claude")
+	}
+
 	var response AnthropicResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return "", ParseUnmarshalError(err, body, resp.StatusCode, "claude")
 	}
 
 	if response.Error != nil {

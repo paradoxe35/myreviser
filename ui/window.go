@@ -43,6 +43,7 @@ type MainWindow struct {
 	providerBinding        binding.String
 	apiKeyBinding          binding.String
 	modelBinding           binding.String
+	baseURLBinding         binding.String
 	hotkeySelectBinding    binding.String
 	hotkeySelectionBinding binding.String
 	promptBinding          binding.String
@@ -112,6 +113,7 @@ func (w *MainWindow) initBindings() {
 	w.providerBinding = binding.NewString()
 	w.apiKeyBinding = binding.NewString()
 	w.modelBinding = binding.NewString()
+	w.baseURLBinding = binding.NewString()
 	w.hotkeySelectBinding = binding.NewString()
 	w.hotkeySelectionBinding = binding.NewString()
 	w.promptBinding = binding.NewString()
@@ -206,12 +208,14 @@ func (w *MainWindow) loadProviderSettings(provider string) {
 	apiKey, _ := w.config.GetAPIKey(provider)
 	w.apiKeyBinding.Set(apiKey)
 
-	// Load model and base URL
+	// Load model
 	w.modelBinding.Set(settings.Model)
 
-	// Update base URL entry if it exists
-	if w.baseURLEntry != nil {
-		w.baseURLEntry.SetText(settings.BaseURL)
+	// Load base URL only for OpenAI provider
+	if provider == "openai" {
+		w.baseURLBinding.Set(settings.BaseURL)
+	} else {
+		w.baseURLBinding.Set("")
 	}
 }
 
@@ -339,6 +343,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	baseURLLabel := widget.NewLabel("Base URL:")
 	baseURLLabel.TextStyle.Bold = true
 	w.baseURLEntry = widget.NewEntry()
+	w.baseURLEntry.Bind(w.baseURLBinding)
 	w.baseURLEntry.PlaceHolder = "https://api.openai.com/v1 (optional)"
 
 	// Create Base URL container for visibility control
@@ -592,16 +597,8 @@ func (w *MainWindow) testAPIConnection() {
 			return
 		}
 
-		// Get Base URL from entry
-		baseURL := ""
-		if w.baseURLEntry != nil {
-			baseURL = w.baseURLEntry.Text
-		}
-
-		// Fallback to provider defaults if not set
-		if baseURL == "" {
-			baseURL = settings.BaseURL
-		}
+		// Get Base URL from binding
+		baseURL, _ := w.baseURLBinding.Get()
 
 		// Create a test provider
 		var testProvider ai.Provider
@@ -671,10 +668,10 @@ func (w *MainWindow) saveSettings() {
 		return
 	}
 
-	// Get base URL from entry
+	// Get base URL from binding (only for OpenAI)
 	baseURL := ""
-	if w.baseURLEntry != nil {
-		baseURL = w.baseURLEntry.Text
+	if provider == "openai" {
+		baseURL, _ = w.baseURLBinding.Get()
 	}
 
 	// Update provider-specific settings
