@@ -134,7 +134,19 @@ func (w *MainWindow) initBindings() {
 	w.charLimitBinding.Set(strconv.Itoa(w.config.Revision.CharacterLimit))
 	w.statusBinding.Set("Ready")
 	w.startMinimizedBinding.Set(w.config.Appearance.StartMinimized)
-	w.startOnLoginBinding.Set(w.config.Appearance.StartOnLogin)
+
+	// Sync StartOnLogin with actual system state
+	// The user might have removed the login item outside the app
+	autoStart := platform.GetAutoStart()
+	actualStartOnLogin := autoStart.IsEnabled()
+	w.startOnLoginBinding.Set(actualStartOnLogin)
+
+	// Update config if out of sync
+	if w.config.Appearance.StartOnLogin != actualStartOnLogin {
+		w.config.Appearance.StartOnLogin = actualStartOnLogin
+		w.config.Save()
+		logger.Info("Synced StartOnLogin with system state", "enabled", actualStartOnLogin)
+	}
 
 	// Set theme, default to "auto" if empty
 	theme := w.config.Appearance.Theme

@@ -31,13 +31,17 @@ func (a *autoStart) Enable() error {
 		logger.Warn("Failed to resolve symlinks", "error", err)
 	}
 
+	// Add quotes around path to handle spaces correctly
+	// This prevents the "Unquoted Service Path" vulnerability
+	quotedPath := fmt.Sprintf(`"%s"`, executable)
+
 	key, err := registry.OpenKey(registry.CURRENT_USER, registryKey, registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("failed to open registry key: %w", err)
 	}
 	defer key.Close()
 
-	if err := key.SetStringValue(registryName, executable); err != nil {
+	if err := key.SetStringValue(registryName, quotedPath); err != nil {
 		return fmt.Errorf("failed to set registry value: %w", err)
 	}
 
