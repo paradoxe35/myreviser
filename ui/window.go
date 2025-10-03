@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"image/color"
+	"os"
 	"strconv"
+	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -77,6 +79,9 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHot
 		hotkeyManager:    hotkeyManager,
 		permissionPrompt: prompt,
 	}
+
+	// Set restart button callback
+	prompt.restartButton.OnTapped = mw.restartApplication
 
 	// Initialize data bindings
 	mw.initBindings()
@@ -720,6 +725,35 @@ func (w *MainWindow) HideWindow() {
 func (w *MainWindow) SetShowHideCallbacks(onShow func(), onHide func()) {
 	w.onShowCallback = onShow
 	w.onHideCallback = onHide
+}
+
+// restartApplication restarts the application
+func (w *MainWindow) restartApplication() {
+	logger.Info("Restarting application")
+
+	// On macOS/Unix, we'll use os.Executable to restart
+	// On Windows, this will also work
+	go func() {
+		time.Sleep(100 * time.Millisecond) // Give UI time to update
+
+		// Import os and syscall at the top if not already imported
+		executable, err := os.Executable()
+		if err != nil {
+			logger.Error("Failed to get executable path", "error", err)
+			return
+		}
+
+		logger.Info("Restarting from", "path", executable)
+
+		// On Unix-like systems (macOS, Linux)
+		err = syscall.Exec(executable, []string{executable}, os.Environ())
+		if err != nil {
+			logger.Error("Failed to restart application", "error", err)
+		}
+	}()
+
+	// Quit current instance
+	w.app.Quit()
 }
 
 // Custom theme types to force light or dark theme

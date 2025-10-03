@@ -16,7 +16,7 @@ type permissionPrompt struct {
 	dividerAboveList       *widget.Separator
 	dividerBelowList       *widget.Separator
 	restartRow             fyne.CanvasObject
-	restartNotice          *widget.Label
+	restartButton          *widget.Button
 }
 
 func newPermissionPrompt() *permissionPrompt {
@@ -46,13 +46,15 @@ func newPermissionPrompt() *permissionPrompt {
 		inputMonitoringButton,
 	)
 
-	restartNotice := widget.NewLabel("All permissions granted. Please restart the application to apply changes.")
-	restartNotice.Wrapping = fyne.TextWrapWord
-	restartNotice.TextStyle = fyne.TextStyle{Bold: true}
+	restartButton := widget.NewButtonWithIcon("Restart Application", theme.MediaReplayIcon(), func() {
+		// Will be set by the window
+	})
+	restartButton.Importance = widget.HighImportance
 
-	restartIcon := widget.NewIcon(theme.ConfirmIcon())
-	restartTextContainer := container.NewMax(restartNotice)
-	restartRow := container.NewBorder(nil, nil, restartIcon, nil, restartTextContainer)
+	// Create restart row with centered button (not full width)
+	restartRow := container.NewPadded(
+		container.NewCenter(restartButton),
+	)
 	restartRow.Hide()
 
 	dividerAbove := widget.NewSeparator()
@@ -80,7 +82,7 @@ func newPermissionPrompt() *permissionPrompt {
 		dividerAboveList:       dividerAbove,
 		dividerBelowList:       dividerBelow,
 		restartRow:             restartRow,
-		restartNotice:          restartNotice,
+		restartButton:          restartButton,
 	}
 }
 
@@ -113,10 +115,9 @@ func (p *permissionPrompt) update(state permissions.State, showRestart bool) {
 		p.restartRow.Hide()
 		p.root.Show()
 	case showRestart:
-		p.infoLabel.SetText("All permissions granted.")
+		p.infoLabel.SetText("All permissions granted! Please restart the application.")
 		p.dividerAboveList.Hide()
 		p.dividerBelowList.Show()
-		p.restartNotice.SetText("All permissions granted. Please restart the application to apply changes.")
 		p.restartRow.Show()
 		p.root.Show()
 	default:
