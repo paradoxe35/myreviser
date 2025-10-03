@@ -475,7 +475,7 @@ jobs:
           SectionEnd
 
           Section "Uninstall"
-            Call StopApplication
+            Call un.StopApplication
 
             Delete "`$INSTDIR\myreviser.exe"
             Delete "`$INSTDIR\README.txt"
@@ -488,7 +488,7 @@ jobs:
             Delete "`$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk"
             RMDir "`$SMPROGRAMS\${PRODUCT_NAME}"
 
-            Call DisableAutoStart
+            Call un.DisableAutoStart
             DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
             DeleteRegKey HKCU "${PRODUCT_INSTALL_REG}"
           SectionEnd
@@ -534,6 +534,10 @@ jobs:
             DeleteRegValue HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}"
           FunctionEnd
 
+          Function un.DisableAutoStart
+            Call DisableAutoStart
+          FunctionEnd
+
           Function RegisterApplication
             WriteUninstaller "`$INSTDIR\Uninstall.exe"
             WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
@@ -550,7 +554,7 @@ jobs:
             WriteRegStr HKCU "${PRODUCT_INSTALL_REG}" "Version" "${PRODUCT_VERSION}"
           FunctionEnd
 
-          Function StopApplication
+          Function un.StopApplication
             nsExec::ExecToStack 'taskkill /F /IM myreviser.exe'
             Pop `$0
           FunctionEnd
