@@ -383,7 +383,7 @@ import (
 
 func main() {
     // Create Fyne application
-    myApp := app.NewWithID("com.myreviser.app")
+    myApp := app.NewWithID("me.pngwasi.myreviser")
     myApp.SetIcon(resourceIconPng) // Generated from assets
 
     // Check for desktop features
@@ -1443,7 +1443,7 @@ func (c *ConfigManager) GetProvider() string {
 [Details]
 Icon = "assets/icon.png"
 Name = "MyReviser"
-ID = "com.myreviser.app"
+ID = "me.pngwasi.myreviser"
 Version = "1.0.0"
 Build = 1
 ```

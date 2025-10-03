@@ -44,6 +44,7 @@ type RevisionConfig struct {
 type AppearanceConfig struct {
 	Theme          string `json:"theme"` // "auto" | "light" | "dark"
 	StartMinimized bool   `json:"start_minimized"`
+	StartOnLogin   bool   `json:"start_on_login"`
 }
 
 type MetaConfig struct {
@@ -129,7 +130,8 @@ func GetDefaultRevision() RevisionConfig {
 func GetDefaultAppearance() AppearanceConfig {
 	return AppearanceConfig{
 		Theme:          "auto",
-		StartMinimized: true,
+		StartMinimized: false,
+		StartOnLogin:   false,
 	}
 }
 

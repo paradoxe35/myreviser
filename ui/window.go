@@ -49,6 +49,7 @@ type MainWindow struct {
 	charLimitBinding       binding.String
 	statusBinding          binding.String
 	startMinimizedBinding  binding.Bool
+	startOnLoginBinding    binding.Bool
 	themeBinding           binding.String
 
 	// UI containers for dynamic visibility
@@ -117,6 +118,7 @@ func (w *MainWindow) initBindings() {
 	w.charLimitBinding = binding.NewString()
 	w.statusBinding = binding.NewString()
 	w.startMinimizedBinding = binding.NewBool()
+	w.startOnLoginBinding = binding.NewBool()
 	w.themeBinding = binding.NewString()
 
 	// Set initial values from config
@@ -132,6 +134,7 @@ func (w *MainWindow) initBindings() {
 	w.charLimitBinding.Set(strconv.Itoa(w.config.Revision.CharacterLimit))
 	w.statusBinding.Set("Ready")
 	w.startMinimizedBinding.Set(w.config.Appearance.StartMinimized)
+	w.startOnLoginBinding.Set(w.config.Appearance.StartOnLogin)
 
 	// Set theme, default to "auto" if empty
 	theme := w.config.Appearance.Theme
@@ -526,12 +529,19 @@ func (w *MainWindow) createSystemSection() fyne.CanvasObject {
 	})
 	startMinimizedCheck.Bind(w.startMinimizedBinding)
 
+	// Start on Login checkbox
+	startOnLoginCheck := widget.NewCheck("Start on login", func(checked bool) {
+		w.startOnLoginBinding.Set(checked)
+	})
+	startOnLoginCheck.Bind(w.startOnLoginBinding)
+
 	form := container.NewVBox(
 		container.NewPadded(themeLabel),
 		container.NewPadded(themeSelect),
 		container.NewPadded(themeDesc),
 		widget.NewSeparator(),
 		container.NewPadded(startMinimizedCheck),
+		container.NewPadded(startOnLoginCheck),
 	)
 
 	return container.NewScroll(form)
@@ -639,6 +649,7 @@ func (w *MainWindow) saveSettings() {
 	prompt, _ := w.promptBinding.Get()
 	charLimitStr, _ := w.charLimitBinding.Get()
 	startMinimized, _ := w.startMinimizedBinding.Get()
+	startOnLogin, _ := w.startOnLoginBinding.Get()
 	themeSetting, _ := w.themeBinding.Get()
 
 	// Parse character limit
@@ -683,7 +694,11 @@ func (w *MainWindow) saveSettings() {
 	w.config.Revision.SystemPrompt = prompt
 	w.config.Revision.CharacterLimit = charLimit
 	w.config.Appearance.StartMinimized = startMinimized
+	w.config.Appearance.StartOnLogin = startOnLogin
 	w.config.Appearance.Theme = themeSetting
+
+	// Handle auto-start changes
+	w.applyAutoStartSetting(startOnLogin)
 
 	// Save to disk
 	if err := w.config.Save(); err != nil {
@@ -726,6 +741,27 @@ func (w *MainWindow) HideWindow() {
 func (w *MainWindow) SetShowHideCallbacks(onShow func(), onHide func()) {
 	w.onShowCallback = onShow
 	w.onHideCallback = onHide
+}
+
+// applyAutoStartSetting enables or disables auto-start based on the setting
+func (w *MainWindow) applyAutoStartSetting(enabled bool) {
+	autoStart := platform.GetAutoStart()
+
+	if enabled {
+		if err := autoStart.Enable(); err != nil {
+			logger.Error("Failed to enable auto-start", "error", err)
+			w.statusBinding.Set("✗ Failed to enable auto-start")
+		} else {
+			logger.Info("Auto-start enabled")
+		}
+	} else {
+		if err := autoStart.Disable(); err != nil {
+			logger.Error("Failed to disable auto-start", "error", err)
+			w.statusBinding.Set("✗ Failed to disable auto-start")
+		} else {
+			logger.Info("Auto-start disabled")
+		}
+	}
 }
 
 // restartApplication restarts the application

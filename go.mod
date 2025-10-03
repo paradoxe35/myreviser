@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	fyne.io/fyne/v2 v2.6.3
 	github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
+	golang.org/x/sys v0.36.0
 )
 
 require (
@@ -37,7 +38,6 @@ require (
 	github.com/yuin/goldmark v1.7.8 // indirect
 	golang.org/x/image v0.28.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -387,7 +387,7 @@ jobs:
           - Ctrl+Win: Revise selected text.
 
           Tips:
-          - Enable "Start with Windows" during setup or toggle later from Settings.
+          - Enable "Start on login" from Settings > System to launch MyReviser automatically.
           - MyReviser runs from the system tray; use the tray menu to quit or update preferences.
 
           Support: https://github.com/paradoxe35/myreviser
@@ -438,7 +438,6 @@ jobs:
           !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser"
           !define PRODUCT_INSTALL_REG "Software\`${PRODUCT_PUBLISHER}\`${PRODUCT_NAME}"
           !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}"
-          !define PRODUCT_AUTORUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
 
           Name "`${PRODUCT_NAME}"
           OutFile "MyReviser-Setup.exe"
@@ -451,16 +450,12 @@ jobs:
           !define MUI_ICON "assets\icon.ico"
           !define MUI_UNICON "assets\icon.ico"
 
-          Var AutoStartCheckbox
-          Var AutoStartState
-
           Function .onInit
             SetShellVarContext current
           FunctionEnd
 
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
-          Page custom AutoStartPageCreate AutoStartPageLeave
           !insertmacro MUI_PAGE_INSTFILES
           !define MUI_FINISHPAGE_RUN "`$INSTDIR\myreviser.exe"
           !define MUI_FINISHPAGE_RUN_TEXT "Launch MyReviser now"
@@ -480,8 +475,6 @@ jobs:
             CreateShortcut "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
             CreateShortcut "`$SMPROGRAMS\`${PRODUCT_NAME}\Uninstall `${PRODUCT_NAME}.lnk" "`$INSTDIR\Uninstall.exe"
             CreateShortcut "`$DESKTOP\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
-
-            Call ConfigureAutoStart
           SectionEnd
 
           Section "Uninstall"
@@ -498,55 +491,9 @@ jobs:
             Delete "`$SMPROGRAMS\`${PRODUCT_NAME}\Uninstall `${PRODUCT_NAME}.lnk"
             RMDir "`$SMPROGRAMS\`${PRODUCT_NAME}"
 
-            Call un.DisableAutoStart
             DeleteRegKey HKCU "`${PRODUCT_UNINST_KEY}"
             DeleteRegKey HKCU "`${PRODUCT_INSTALL_REG}"
           SectionEnd
-
-          Function AutoStartPageCreate
-            nsDialogs::Create 1018
-            Pop `$0
-            `${If} `$0 == error
-              Abort
-            `${EndIf}
-
-            `${NSD_CreateLabel} 0 0 100% 24u "Start MyReviser automatically when you sign in?"
-            Pop `$1
-
-            `${NSD_CreateCheckbox} 0 30u 100% 12u "Enable auto-start at login"
-            Pop `$AutoStartCheckbox
-
-            ReadRegStr `$2 HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}"
-            `${If} `$2 != ""
-              `${NSD_Check} `$AutoStartCheckbox
-            `${EndIf}
-
-            nsDialogs::Show
-          FunctionEnd
-
-          Function AutoStartPageLeave
-            `${NSD_GetState} `$AutoStartCheckbox `$AutoStartState
-          FunctionEnd
-
-          Function ConfigureAutoStart
-            `${If} `$AutoStartState == `${BST_CHECKED}
-              Call EnableAutoStart
-            `${Else}
-              Call DisableAutoStart
-            `${EndIf}
-          FunctionEnd
-
-          Function EnableAutoStart
-            WriteRegStr HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}" '"`$INSTDIR\myreviser.exe"'
-          FunctionEnd
-
-          Function DisableAutoStart
-            DeleteRegValue HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}"
-          FunctionEnd
-
-          Function un.DisableAutoStart
-            DeleteRegValue HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}"
-          FunctionEnd
 
           Function RegisterApplication
             WriteUninstaller "`$INSTDIR\Uninstall.exe"
