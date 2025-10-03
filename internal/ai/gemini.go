@@ -12,25 +12,30 @@ import (
 
 // GeminiProvider implements the Provider interface for Google Gemini
 type GeminiProvider struct {
-	APIKey  string
-	BaseURL string
-	Model   string
-	client  *http.Client
+	APIKey      string
+	BaseURL     string
+	Model       string
+	Temperature float64
+	client      *http.Client
 }
 
 // NewGeminiProvider creates a new Google Gemini provider
-func NewGeminiProvider(apiKey, baseURL, model string) *GeminiProvider {
+func NewGeminiProvider(apiKey, baseURL, model string, temperature float64) *GeminiProvider {
 	if baseURL == "" {
 		baseURL = "https://generativelanguage.googleapis.com"
 	}
 	if model == "" {
 		model = "gemini-2.5-flash-lite"
 	}
+	if temperature == 0 {
+		temperature = 1.0
+	}
 	return &GeminiProvider{
-		APIKey:  apiKey,
-		BaseURL: strings.TrimRight(baseURL, "/"),
-		Model:   model,
-		client:  &http.Client{},
+		APIKey:      apiKey,
+		BaseURL:     strings.TrimRight(baseURL, "/"),
+		Model:       model,
+		Temperature: temperature,
+		client:      &http.Client{},
 	}
 }
 
@@ -40,6 +45,7 @@ type ThinkingConfig struct {
 
 type GenerationConfig struct {
 	ThinkingConfig ThinkingConfig `json:"thinkingConfig"`
+	Temperature    float64        `json:"temperature"`
 }
 
 // GeminiRequest represents the request structure for Gemini API
@@ -94,6 +100,7 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 			ThinkingConfig: ThinkingConfig{
 				ThinkingBudget: 0,
 			},
+			Temperature: p.Temperature,
 		},
 	}
 
@@ -164,4 +171,9 @@ func (p *GeminiProvider) GetName() string {
 // GetModel returns the model being used
 func (p *GeminiProvider) GetModel() string {
 	return p.Model
+}
+
+// GetModel returns the temperature being used
+func (p *GeminiProvider) GetTemperature() float64 {
+	return p.Temperature
 }

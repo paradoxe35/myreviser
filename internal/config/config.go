@@ -19,9 +19,10 @@ type Config struct {
 }
 
 type ProviderSettings struct {
-	APIKey  string `json:"api_key"`
-	BaseURL string `json:"base_url,omitempty"`
-	Model   string `json:"model,omitempty"`
+	APIKey      string  `json:"api_key"`
+	BaseURL     string  `json:"base_url,omitempty"`
+	Model       string  `json:"model,omitempty"`
+	Temperature float64 `json:"temperature,omitempty"`
 }
 
 type AIProviderConfig struct {
@@ -69,16 +70,19 @@ func Default() *Config {
 			Provider: "openai",
 			Providers: map[string]ProviderSettings{
 				"openai": {
-					BaseURL: "https://api.openai.com/v1",
-					Model:   "gpt-4o",
+					BaseURL:     "https://api.openai.com/v1",
+					Model:       "gpt-4o",
+					Temperature: 1.0,
 				},
 				"claude": {
-					BaseURL: "https://api.anthropic.com",
-					Model:   "claude-3-5-haiku-20241022",
+					BaseURL:     "https://api.anthropic.com",
+					Model:       "claude-3-5-haiku-20241022",
+					Temperature: 1.0,
 				},
 				"gemini": {
-					BaseURL: "https://generativelanguage.googleapis.com",
-					Model:   "gemini-2.0-flash-exp",
+					BaseURL:     "https://generativelanguage.googleapis.com",
+					Model:       "gemini-2.0-flash-exp",
+					Temperature: 1.0,
 				},
 			},
 		},
@@ -172,6 +176,15 @@ func Load() (*Config, error) {
 	}
 	if cfg.Revision.SystemPrompt == "" {
 		cfg.Revision.SystemPrompt = GetDefaultRevision().SystemPrompt
+	}
+
+	if cfg.AIProvider.Providers != nil {
+		for name, settings := range cfg.AIProvider.Providers {
+			if settings.Temperature == 0 {
+				settings.Temperature = 1.0
+				cfg.AIProvider.Providers[name] = settings
+			}
+		}
 	}
 
 	currentConfig = cfg
@@ -269,6 +282,10 @@ func (c *Config) GetProviderSettings(provider string) ProviderSettings {
 		return ProviderSettings{}
 	}
 
+	if settings.Temperature == 0 {
+		settings.Temperature = 1.0
+	}
+
 	return settings
 }
 
@@ -279,6 +296,10 @@ func (c *Config) SetProviderSettings(provider string, settings ProviderSettings)
 
 	if c.AIProvider.Providers == nil {
 		c.AIProvider.Providers = make(map[string]ProviderSettings)
+	}
+
+	if settings.Temperature == 0 {
+		settings.Temperature = 1.0
 	}
 
 	c.AIProvider.Providers[provider] = settings

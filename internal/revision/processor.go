@@ -74,17 +74,17 @@ func (p *Processor) initializeProviders() error {
 	// Register providers based on configuration
 	switch currentProvider {
 	case "openai":
-		provider := ai.NewOpenAIProvider(apiKey, settings.BaseURL, settings.Model)
+		provider := ai.NewOpenAIProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
 		p.providerFactory.Register("openai", provider)
 		p.providerFactory.SetCurrent("openai")
 
 	case "claude":
-		provider := ai.NewAnthropicProvider(apiKey, settings.BaseURL, settings.Model)
+		provider := ai.NewAnthropicProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
 		p.providerFactory.Register("claude", provider)
 		p.providerFactory.SetCurrent("claude")
 
 	case "gemini":
-		provider := ai.NewGeminiProvider(apiKey, settings.BaseURL, settings.Model)
+		provider := ai.NewGeminiProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
 		p.providerFactory.Register("gemini", provider)
 		p.providerFactory.SetCurrent("gemini")
 
@@ -259,6 +259,7 @@ func (p *Processor) reviseText(text string) (string, error) {
 	logger.Info("Sending text to AI provider",
 		"provider", provider.GetName(),
 		"model", provider.GetModel(),
+		"temperature", provider.GetTemperature(),
 		"text", text,
 		"text_length", len(text),
 	)

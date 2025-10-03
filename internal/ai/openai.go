@@ -12,32 +12,38 @@ import (
 
 // OpenAIProvider implements the Provider interface for OpenAI
 type OpenAIProvider struct {
-	APIKey  string
-	BaseURL string
-	Model   string
-	client  *http.Client
+	APIKey      string
+	BaseURL     string
+	Model       string
+	Temperature float64
+	client      *http.Client
 }
 
 // NewOpenAIProvider creates a new OpenAI provider
-func NewOpenAIProvider(apiKey, baseURL, model string) *OpenAIProvider {
+func NewOpenAIProvider(apiKey, baseURL, model string, temperature float64) *OpenAIProvider {
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
 	}
 	if model == "" {
 		model = "gpt-4o"
 	}
+	if temperature == 0 {
+		temperature = 1.0
+	}
 	return &OpenAIProvider{
-		APIKey:  apiKey,
-		BaseURL: strings.TrimRight(baseURL, "/"),
-		Model:   model,
-		client:  &http.Client{},
+		APIKey:      apiKey,
+		BaseURL:     strings.TrimRight(baseURL, "/"),
+		Model:       model,
+		Temperature: temperature,
+		client:      &http.Client{},
 	}
 }
 
 // OpenAIRequest represents the request structure for OpenAI API
 type OpenAIRequest struct {
-	Model    string          `json:"model"`
-	Messages []OpenAIMessage `json:"messages"`
+	Model       string          `json:"model"`
+	Messages    []OpenAIMessage `json:"messages"`
+	Temperature float64         `json:"temperature"`
 }
 
 // OpenAIMessage represents a message in the OpenAI API
@@ -70,8 +76,9 @@ func (p *OpenAIProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 	}
 
 	requestBody := OpenAIRequest{
-		Model:    p.Model,
-		Messages: messages,
+		Model:       p.Model,
+		Messages:    messages,
+		Temperature: p.Temperature,
 	}
 
 	jsonData, err := json.Marshal(requestBody)
@@ -133,4 +140,9 @@ func (p *OpenAIProvider) GetName() string {
 // GetModel returns the model being used
 func (p *OpenAIProvider) GetModel() string {
 	return p.Model
+}
+
+// GetModel returns the temperature being used
+func (p *OpenAIProvider) GetTemperature() float64 {
+	return p.Temperature
 }

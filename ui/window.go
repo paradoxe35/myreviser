@@ -561,6 +561,7 @@ func (w *MainWindow) testAPIConnection() {
 	go func() {
 		// Get current provider settings
 		provider, _ := w.providerBinding.Get()
+		settings := w.config.GetProviderSettings(provider)
 		apiKey, _ := w.apiKeyBinding.Get()
 		model, _ := w.modelBinding.Get()
 
@@ -577,7 +578,6 @@ func (w *MainWindow) testAPIConnection() {
 
 		// Fallback to provider defaults if not set
 		if baseURL == "" {
-			settings := w.config.GetProviderSettings(provider)
 			baseURL = settings.BaseURL
 		}
 
@@ -585,11 +585,11 @@ func (w *MainWindow) testAPIConnection() {
 		var testProvider ai.Provider
 		switch provider {
 		case "openai":
-			testProvider = ai.NewOpenAIProvider(apiKey, baseURL, model)
+			testProvider = ai.NewOpenAIProvider(apiKey, baseURL, model, settings.Temperature)
 		case "claude":
-			testProvider = ai.NewAnthropicProvider(apiKey, baseURL, model)
+			testProvider = ai.NewAnthropicProvider(apiKey, baseURL, model, settings.Temperature)
 		case "gemini":
-			testProvider = ai.NewGeminiProvider(apiKey, baseURL, model)
+			testProvider = ai.NewGeminiProvider(apiKey, baseURL, model, settings.Temperature)
 		default:
 			w.statusBinding.Set("Error: Unknown provider")
 			return
@@ -655,9 +655,11 @@ func (w *MainWindow) saveSettings() {
 	}
 
 	// Update provider-specific settings
+	existingSettings := w.config.GetProviderSettings(provider)
 	settings := config.ProviderSettings{
-		Model:   model,
-		BaseURL: baseURL,
+		Model:       model,
+		BaseURL:     baseURL,
+		Temperature: existingSettings.Temperature,
 	}
 	w.config.SetProviderSettings(provider, settings)
 

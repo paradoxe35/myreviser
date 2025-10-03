@@ -368,79 +368,193 @@ jobs:
             Move-Item MyReviser.exe myreviser-windows-${{ matrix.arch }}.exe
           }
 
-      - name: Create portable ZIP
+      - name: Generate Windows README
+        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist\portable
-          Copy-Item myreviser-windows-${{ matrix.arch }}.exe dist\portable\myreviser.exe
-          if (Test-Path "assets/icon.ico") {
-            Copy-Item assets\icon.ico dist\portable\
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          @"
+          MyReviser for Windows
+
+          Thank you for installing MyReviser, the Fyne-powered AI text revision assistant.
+
+          Getting Started:
+          1. Launch myreviser.exe (or use the Start Menu shortcut).
+          2. Right-click the tray icon to open Settings.
+          3. Configure your AI provider (OpenAI, Claude, or Gemini) and hotkeys.
+
+          Default Hotkeys:
+          - Ctrl+Alt+Space: Revise all text.
+          - Ctrl+Win: Revise selected text.
+
+          Tips:
+          - Enable "Start with Windows" during setup or toggle later from Settings.
+          - MyReviser runs from the system tray; use the tray menu to quit or update preferences.
+
+          Support: https://github.com/paradoxe35/myreviser
+          "@ | Out-File -FilePath dist\README.txt -Encoding UTF8
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\portable | Out-Null
+          Copy-Item myreviser-windows-${{ matrix.arch }}.exe dist\portable\myreviser.exe -Force
+          if (Test-Path "assets\icon.ico") {
+            Copy-Item assets\icon.ico dist\portable\icon.ico -Force
           }
-          Compress-Archive -Path dist\portable\* -DestinationPath myreviser-windows-${{ matrix.arch }}-portable.zip
+          if (Test-Path "dist\README.txt") {
+            Copy-Item dist\README.txt dist\portable\README.txt -Force
+          }
+          Compress-Archive -Path dist\portable\* -DestinationPath myreviser-windows-${{ matrix.arch }}-portable.zip -Force
 
       - name: Create installer (NSIS)
         if: matrix.arch == 'amd64'
+        shell: pwsh
         run: |
-          # Install NSIS
           choco install nsis -y
           $env:Path += ";C:\Program Files (x86)\NSIS"
 
-          # Sanitize version for Windows installer
-          $VERSION = "${{ github.ref_name }}" -replace '^v','' -replace '[^0-9a-zA-Z.]','-'
-          if ([string]::IsNullOrEmpty($VERSION)) { $VERSION = "0.0.0-dev" }
+          $version = "${{ github.ref_name }}" -replace '^v','' -replace '[^0-9a-zA-Z.]','-'
+          if ([string]::IsNullOrEmpty($version)) { $version = "0.0.0-dev" }
 
-          # Create NSIS script
           @"
+          Unicode true
+          !include "MUI2.nsh"
+          !include "nsDialogs.nsh"
+          !include "LogicLib.nsh"
+
           !define PRODUCT_NAME "MyReviser"
-          !define PRODUCT_VERSION "$VERSION"
-          !define PRODUCT_PUBLISHER "Paradoxe Ng"
+          !define PRODUCT_VERSION "$version"
+          !define PRODUCT_PUBLISHER "MyReviser Team"
           !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser"
+          !define PRODUCT_INSTALL_REG "Software\${PRODUCT_PUBLISHER}\${PRODUCT_NAME}"
+          !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
+          !define PRODUCT_AUTORUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
 
-          Name "`${PRODUCT_NAME}"
-          OutFile "myreviser-windows-${{ matrix.arch }}-installer.exe"
-          InstallDir "`$PROGRAMFILES64\`${PRODUCT_NAME}"
-          RequestExecutionLevel admin
+          Name "${PRODUCT_NAME}"
+          OutFile "MyReviser-Setup.exe"
+          InstallDir "`$LOCALAPPDATA\${PRODUCT_NAME}"
+          InstallDirRegKey HKCU "${PRODUCT_INSTALL_REG}" "InstallDir"
+          RequestExecutionLevel user
+          SetCompress auto
+          SetShellVarContext current
 
-          Section "MainSection" SEC01
+          !define MUI_ABORTWARNING
+          !define MUI_ICON "assets\icon.ico"
+          !define MUI_UNICON "assets\icon.ico"
+
+          Var AutoStartCheckbox
+          Var AutoStartState
+
+          !insertmacro MUI_PAGE_WELCOME
+          !insertmacro MUI_PAGE_DIRECTORY
+          Page custom AutoStartPageCreate AutoStartPageLeave
+          !insertmacro MUI_PAGE_INSTFILES
+          !define MUI_FINISHPAGE_RUN "`$INSTDIR\myreviser.exe"
+          !define MUI_FINISHPAGE_RUN_TEXT "Launch MyReviser now"
+          !insertmacro MUI_PAGE_FINISH
+
+          !insertmacro MUI_LANGUAGE "English"
+
+          Section "MyReviser" SEC_APP
             SetOutPath "`$INSTDIR"
-            File "myreviser-windows-${{ matrix.arch }}.exe"
             File /oname=myreviser.exe "myreviser-windows-${{ matrix.arch }}.exe"
+            File /nonfatal /oname=README.txt "dist\README.txt"
+            File /nonfatal /oname=icon.ico "assets\icon.ico"
 
-            ; Create shortcuts
-            CreateDirectory "`$SMPROGRAMS\`${PRODUCT_NAME}"
-            CreateShortcut "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
-            CreateShortcut "`$DESKTOP\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
+            Call RegisterApplication
 
-            ; Add to startup (optional)
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "`${PRODUCT_NAME}" "`$INSTDIR\myreviser.exe"
+            CreateDirectory "`$SMPROGRAMS\${PRODUCT_NAME}"
+            CreateShortcut "`$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
+            CreateShortcut "`$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "`$INSTDIR\Uninstall.exe"
+            CreateShortcut "`$DESKTOP\${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
 
-            ; Write uninstaller
-            WriteUninstaller "`$INSTDIR\Uninstall.exe"
-
-            ; Write registry keys
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "DisplayName" "`${PRODUCT_NAME}"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "UninstallString" "`$INSTDIR\Uninstall.exe"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "DisplayVersion" "`${PRODUCT_VERSION}"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}" "Publisher" "`${PRODUCT_PUBLISHER}"
+            Call ConfigureAutoStart
           SectionEnd
 
           Section "Uninstall"
+            Call StopApplication
+
             Delete "`$INSTDIR\myreviser.exe"
+            Delete "`$INSTDIR\README.txt"
+            Delete "`$INSTDIR\icon.ico"
             Delete "`$INSTDIR\Uninstall.exe"
-            Delete "`$DESKTOP\`${PRODUCT_NAME}.lnk"
-            Delete "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk"
-            RMDir "`$SMPROGRAMS\`${PRODUCT_NAME}"
             RMDir "`$INSTDIR"
 
-            ; Remove from startup
-            DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "`${PRODUCT_NAME}"
+            Delete "`$DESKTOP\${PRODUCT_NAME}.lnk"
+            Delete "`$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
+            Delete "`$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk"
+            RMDir "`$SMPROGRAMS\${PRODUCT_NAME}"
 
-            ; Remove registry keys
-            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}"
+            Call DisableAutoStart
+            DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+            DeleteRegKey HKCU "${PRODUCT_INSTALL_REG}"
           SectionEnd
+
+          Function AutoStartPageCreate
+            nsDialogs::Create 1018
+            Pop `$0
+            ${If} `$0 == error
+              Abort
+            ${EndIf}
+
+            ${NSD_CreateLabel} 0 0 100% 24u "Start MyReviser automatically when you sign in?"
+            Pop `$1
+
+            ${NSD_CreateCheckbox} 0 30u 100% 12u "Enable auto-start at login"
+            Pop `$AutoStartCheckbox
+
+            ReadRegStr `$2 HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}"
+            ${If} `$2 != ""
+              ${NSD_Check} `$AutoStartCheckbox
+            ${EndIf}
+
+            nsDialogs::Show
+          FunctionEnd
+
+          Function AutoStartPageLeave
+            ${NSD_GetState} `$AutoStartCheckbox `$AutoStartState
+          FunctionEnd
+
+          Function ConfigureAutoStart
+            ${If} `$AutoStartState == ${BST_CHECKED}
+              Call EnableAutoStart
+            ${Else}
+              Call DisableAutoStart
+            ${EndIf}
+          FunctionEnd
+
+          Function EnableAutoStart
+            WriteRegStr HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}" "\"`$INSTDIR\myreviser.exe\""
+          FunctionEnd
+
+          Function DisableAutoStart
+            DeleteRegValue HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}"
+          FunctionEnd
+
+          Function RegisterApplication
+            WriteUninstaller "`$INSTDIR\Uninstall.exe"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" "`$INSTDIR\Uninstall.exe"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" "`$INSTDIR\myreviser.exe"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
+            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "`$INSTDIR"
+            WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
+            WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+
+            WriteRegStr HKCU "${PRODUCT_INSTALL_REG}" "InstallDir" "`$INSTDIR"
+            WriteRegStr HKCU "${PRODUCT_INSTALL_REG}" "Version" "${PRODUCT_VERSION}"
+          FunctionEnd
+
+          Function StopApplication
+            nsExec::ExecToStack 'taskkill /F /IM myreviser.exe'
+            Pop `$0
+          FunctionEnd
           "@ | Out-File -Encoding UTF8 installer.nsi
 
-          # Build installer
           makensis installer.nsi
+          Move-Item MyReviser-Setup.exe myreviser-windows-${{ matrix.arch }}-installer.exe -Force
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4

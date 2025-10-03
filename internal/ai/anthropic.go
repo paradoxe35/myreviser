@@ -12,34 +12,40 @@ import (
 
 // AnthropicProvider implements the Provider interface for Claude
 type AnthropicProvider struct {
-	APIKey  string
-	BaseURL string
-	Model   string
-	client  *http.Client
+	APIKey      string
+	BaseURL     string
+	Model       string
+	Temperature float64
+	client      *http.Client
 }
 
 // NewAnthropicProvider creates a new Anthropic/Claude provider
-func NewAnthropicProvider(apiKey, baseURL, model string) *AnthropicProvider {
+func NewAnthropicProvider(apiKey, baseURL, model string, temperature float64) *AnthropicProvider {
 	if baseURL == "" {
 		baseURL = "https://api.anthropic.com"
 	}
 	if model == "" {
 		model = "claude-3-5-haiku-20241022"
 	}
+	if temperature == 0 {
+		temperature = 1.0
+	}
 	return &AnthropicProvider{
-		APIKey:  apiKey,
-		BaseURL: strings.TrimRight(baseURL, "/"),
-		Model:   model,
-		client:  &http.Client{},
+		APIKey:      apiKey,
+		BaseURL:     strings.TrimRight(baseURL, "/"),
+		Model:       model,
+		Temperature: temperature,
+		client:      &http.Client{},
 	}
 }
 
 // AnthropicRequest represents the request structure for Claude API
 type AnthropicRequest struct {
-	Model     string             `json:"model"`
-	Messages  []AnthropicMessage `json:"messages"`
-	MaxTokens int                `json:"max_tokens"`
-	System    string             `json:"system,omitempty"`
+	Model       string             `json:"model"`
+	Messages    []AnthropicMessage `json:"messages"`
+	MaxTokens   int                `json:"max_tokens"`
+	System      string             `json:"system,omitempty"`
+	Temperature float64            `json:"temperature"`
 }
 
 // AnthropicMessage represents a message in the Claude API
@@ -71,10 +77,11 @@ func (p *AnthropicProvider) ReviseText(ctx context.Context, text, systemPrompt s
 	}
 
 	requestBody := AnthropicRequest{
-		Model:     p.Model,
-		Messages:  messages,
-		MaxTokens: 4096,
-		System:    systemPrompt,
+		Model:       p.Model,
+		Messages:    messages,
+		MaxTokens:   4096,
+		System:      systemPrompt,
+		Temperature: p.Temperature,
 	}
 
 	jsonData, err := json.Marshal(requestBody)
@@ -145,4 +152,9 @@ func (p *AnthropicProvider) GetName() string {
 // GetModel returns the model being used
 func (p *AnthropicProvider) GetModel() string {
 	return p.Model
+}
+
+// GetModel returns the temperature being used
+func (p *AnthropicProvider) GetTemperature() float64 {
+	return p.Temperature
 }

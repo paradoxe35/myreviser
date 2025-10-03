@@ -13,6 +13,7 @@ type Provider interface {
 	ValidateConfig() error
 	GetName() string
 	GetModel() string
+	GetTemperature() float64
 }
 
 // ProviderFactory manages AI providers
