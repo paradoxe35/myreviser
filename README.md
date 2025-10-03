@@ -28,6 +28,12 @@ _For detailed build artifacts or manual installation notes, see the release desc
 2. Set the global hotkeys you want to use for "Revise Selection" and "Select All & Revise".
 3. Trigger a hotkey in any application—the selected text is automatically sent to the provider and replaced with the improved version.
 
+Default hotkeys (changeable under Settings → Hotkeys):
+
+- macOS: `Ctrl + Option + Space` (Select All & Revise), `Ctrl + Cmd` (Revise Selection)
+- Windows: `Ctrl + Alt + Space`, `Ctrl + Win`
+- Linux: `Ctrl + Alt + Space`, `Ctrl + Super`
+
 ## Configuration
 
 Configuration files are created automatically after the first run.
