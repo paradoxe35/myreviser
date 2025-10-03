@@ -413,6 +413,15 @@ jobs:
           choco install nsis -y
           $env:Path += ";C:\Program Files (x86)\NSIS"
 
+          # Verify required files exist
+          if (-not (Test-Path "myreviser-windows-${{ matrix.arch }}.exe")) {
+            Write-Error "Source executable not found: myreviser-windows-${{ matrix.arch }}.exe"
+            exit 1
+          }
+          if (-not (Test-Path "assets\icon.ico")) {
+            Write-Warning "Icon file not found: assets\icon.ico - NSIS will fail"
+          }
+
           $version = "${{ github.ref_name }}" -replace '^v','' -replace '[^0-9a-zA-Z.]','-'
           if ([string]::IsNullOrEmpty($version)) { $version = "0.0.0-dev" }
 
@@ -426,14 +435,14 @@ jobs:
           !define PRODUCT_VERSION "$version"
           !define PRODUCT_PUBLISHER "MyReviser Team"
           !define PRODUCT_WEB_SITE "https://github.com/paradoxe35/myreviser"
-          !define PRODUCT_INSTALL_REG "Software\${PRODUCT_PUBLISHER}\${PRODUCT_NAME}"
-          !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
+          !define PRODUCT_INSTALL_REG "Software\`${PRODUCT_PUBLISHER}\`${PRODUCT_NAME}"
+          !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\`${PRODUCT_NAME}"
           !define PRODUCT_AUTORUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
 
-          Name "${PRODUCT_NAME}"
+          Name "`${PRODUCT_NAME}"
           OutFile "MyReviser-Setup.exe"
-          InstallDir "`$LOCALAPPDATA\${PRODUCT_NAME}"
-          InstallDirRegKey HKCU "${PRODUCT_INSTALL_REG}" "InstallDir"
+          InstallDir "`$LOCALAPPDATA\`${PRODUCT_NAME}"
+          InstallDirRegKey HKCU "`${PRODUCT_INSTALL_REG}" "InstallDir"
           RequestExecutionLevel user
           SetCompress auto
 
@@ -466,10 +475,10 @@ jobs:
 
             Call RegisterApplication
 
-            CreateDirectory "`$SMPROGRAMS\${PRODUCT_NAME}"
-            CreateShortcut "`$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
-            CreateShortcut "`$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk" "`$INSTDIR\Uninstall.exe"
-            CreateShortcut "`$DESKTOP\${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
+            CreateDirectory "`$SMPROGRAMS\`${PRODUCT_NAME}"
+            CreateShortcut "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
+            CreateShortcut "`$SMPROGRAMS\`${PRODUCT_NAME}\Uninstall `${PRODUCT_NAME}.lnk" "`$INSTDIR\Uninstall.exe"
+            CreateShortcut "`$DESKTOP\`${PRODUCT_NAME}.lnk" "`$INSTDIR\myreviser.exe"
 
             Call ConfigureAutoStart
           SectionEnd
@@ -483,75 +492,75 @@ jobs:
             Delete "`$INSTDIR\Uninstall.exe"
             RMDir "`$INSTDIR"
 
-            Delete "`$DESKTOP\${PRODUCT_NAME}.lnk"
-            Delete "`$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
-            Delete "`$SMPROGRAMS\${PRODUCT_NAME}\Uninstall ${PRODUCT_NAME}.lnk"
-            RMDir "`$SMPROGRAMS\${PRODUCT_NAME}"
+            Delete "`$DESKTOP\`${PRODUCT_NAME}.lnk"
+            Delete "`$SMPROGRAMS\`${PRODUCT_NAME}\`${PRODUCT_NAME}.lnk"
+            Delete "`$SMPROGRAMS\`${PRODUCT_NAME}\Uninstall `${PRODUCT_NAME}.lnk"
+            RMDir "`$SMPROGRAMS\`${PRODUCT_NAME}"
 
             Call un.DisableAutoStart
-            DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
-            DeleteRegKey HKCU "${PRODUCT_INSTALL_REG}"
+            DeleteRegKey HKCU "`${PRODUCT_UNINST_KEY}"
+            DeleteRegKey HKCU "`${PRODUCT_INSTALL_REG}"
           SectionEnd
 
           Function AutoStartPageCreate
             nsDialogs::Create 1018
             Pop `$0
-            ${If} `$0 == error
+            `${If} `$0 == error
               Abort
-            ${EndIf}
+            `${EndIf}
 
-            ${NSD_CreateLabel} 0 0 100% 24u "Start MyReviser automatically when you sign in?"
+            `${NSD_CreateLabel} 0 0 100% 24u "Start MyReviser automatically when you sign in?"
             Pop `$1
 
-            ${NSD_CreateCheckbox} 0 30u 100% 12u "Enable auto-start at login"
+            `${NSD_CreateCheckbox} 0 30u 100% 12u "Enable auto-start at login"
             Pop `$AutoStartCheckbox
 
-            ReadRegStr `$2 HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}"
-            ${If} `$2 != ""
-              ${NSD_Check} `$AutoStartCheckbox
-            ${EndIf}
+            ReadRegStr `$2 HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}"
+            `${If} `$2 != ""
+              `${NSD_Check} `$AutoStartCheckbox
+            `${EndIf}
 
             nsDialogs::Show
           FunctionEnd
 
           Function AutoStartPageLeave
-            ${NSD_GetState} `$AutoStartCheckbox `$AutoStartState
+            `${NSD_GetState} `$AutoStartCheckbox `$AutoStartState
           FunctionEnd
 
           Function ConfigureAutoStart
-            ${If} `$AutoStartState == ${BST_CHECKED}
+            `${If} `$AutoStartState == `${BST_CHECKED}
               Call EnableAutoStart
-            ${Else}
+            `${Else}
               Call DisableAutoStart
-            ${EndIf}
+            `${EndIf}
           FunctionEnd
 
           Function EnableAutoStart
-            WriteRegStr HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}" "\"`$INSTDIR\myreviser.exe\""
+            WriteRegStr HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}" "\"`$INSTDIR\myreviser.exe\""
           FunctionEnd
 
           Function DisableAutoStart
-            DeleteRegValue HKCU "${PRODUCT_AUTORUN_KEY}" "${PRODUCT_NAME}"
+            DeleteRegValue HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}"
           FunctionEnd
 
           Function un.DisableAutoStart
-            Call DisableAutoStart
+            DeleteRegValue HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}"
           FunctionEnd
 
           Function RegisterApplication
             WriteUninstaller "`$INSTDIR\Uninstall.exe"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" "`$INSTDIR\Uninstall.exe"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" "`$INSTDIR\myreviser.exe"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
-            WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "`$INSTDIR"
-            WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
-            WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "DisplayName" "`${PRODUCT_NAME}"
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "UninstallString" "`$INSTDIR\Uninstall.exe"
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "DisplayIcon" "`$INSTDIR\myreviser.exe"
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "DisplayVersion" "`${PRODUCT_VERSION}"
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "Publisher" "`${PRODUCT_PUBLISHER}"
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "URLInfoAbout" "`${PRODUCT_WEB_SITE}"
+            WriteRegStr HKCU "`${PRODUCT_UNINST_KEY}" "InstallLocation" "`$INSTDIR"
+            WriteRegDWORD HKCU "`${PRODUCT_UNINST_KEY}" "NoModify" 1
+            WriteRegDWORD HKCU "`${PRODUCT_UNINST_KEY}" "NoRepair" 1
 
-            WriteRegStr HKCU "${PRODUCT_INSTALL_REG}" "InstallDir" "`$INSTDIR"
-            WriteRegStr HKCU "${PRODUCT_INSTALL_REG}" "Version" "${PRODUCT_VERSION}"
+            WriteRegStr HKCU "`${PRODUCT_INSTALL_REG}" "InstallDir" "`$INSTDIR"
+            WriteRegStr HKCU "`${PRODUCT_INSTALL_REG}" "Version" "`${PRODUCT_VERSION}"
           FunctionEnd
 
           Function un.StopApplication
@@ -560,8 +569,25 @@ jobs:
           FunctionEnd
           "@ | Out-File -Encoding UTF8 installer.nsi
 
+          Write-Host "NSIS script created, contents:"
+          Get-Content installer.nsi | Select-Object -First 20
+          Write-Host "..."
+          Get-Content installer.nsi | Select-Object -Last 20
+
+          Write-Host "`nCompiling NSIS installer..."
           makensis installer.nsi
-          Move-Item MyReviser-Setup.exe myreviser-windows-${{ matrix.arch }}-installer.exe -Force
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "NSIS compilation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+
+          if (Test-Path "MyReviser-Setup.exe") {
+            Write-Host "Installer created successfully"
+            Move-Item MyReviser-Setup.exe myreviser-windows-${{ matrix.arch }}-installer.exe -Force
+          } else {
+            Write-Error "MyReviser-Setup.exe was not created by NSIS"
+            exit 1
+          }
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4

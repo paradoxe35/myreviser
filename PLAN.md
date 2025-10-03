@@ -2,13 +2,14 @@
 
 > **🚀 Latest Update (Oct 2025)**: Successfully migrated system input layer to **Rust FFI** for better cross-platform compatibility and reliability. All system interactions (global hotkeys, clipboard, key simulation) are now handled via Rust FFI (rdev, arboard, enigo).
 
-
 ## Project Overview
+
 MyReviser is a cross-platform text revision tool built with **Go + Fyne UI + Rust FFI** that integrates with AI providers to automatically enhance text quality, fix grammar, and improve clarity while preserving the original intent and language.
 
 **Note**: For the latest Fyne documentation and API references, use Context7 with library ID: `/fyne-io/docs.fyne.io`
 
 ## Core Features
+
 - **Real-time text revision** via keyboard shortcuts
 - **Multiple AI provider support** (OpenAI, Claude Anthropic, Google Gemini)
 - **Cross-platform compatibility** (Windows, macOS, Linux)
@@ -19,6 +20,7 @@ MyReviser is a cross-platform text revision tool built with **Go + Fyne UI + Rus
 ## Technology Stack
 
 ### Core Technologies
+
 - **Language**: Go 1.24+ with Rust FFI
 - **GUI Framework**: Fyne (v2.6.3+) - Cross-platform Go UI framework
 - **System Tray**: Native Fyne systray support via `desktop.App` interface
@@ -37,12 +39,14 @@ MyReviser is a cross-platform text revision tool built with **Go + Fyne UI + Rus
 
 **Why Rust FFI?**
 We use battle-tested Rust libraries via FFI for:
+
 - Better cross-platform support
 - More reliable system integration
 - Higher performance
 - Static linking for simpler deployment
 
 **FFI Implementation:**
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Go Application                        │
@@ -76,10 +80,12 @@ We use battle-tested Rust libraries via FFI for:
 ```
 
 **Build Output:**
+
 - Rust: `lib/libmyreviser_ffi.a` (static library, ~9MB)
 - Go: `bin/myreviser` (with embedded Rust, ~24MB with -release flag)
 
 **Memory Safety:**
+
 - All FFI resources use opaque pointers (`*mut c_void`)
 - Explicit cleanup with `Close()` methods
 - String memory properly managed across boundaries
@@ -90,6 +96,7 @@ See [MEMORY_LEAK_ANALYSIS.md](MEMORY_LEAK_ANALYSIS.md) for detailed FFI safety a
 ### System Requirements
 
 #### Build Requirements
+
 - **Go**: 1.24 or later
 - **Rust**: 1.70+ (stable)
 - **CGO**: Required for FFI integration
@@ -97,6 +104,7 @@ See [MEMORY_LEAK_ANALYSIS.md](MEMORY_LEAK_ANALYSIS.md) for detailed FFI safety a
 #### Platform-Specific Dependencies
 
 **Linux:**
+
 ```bash
 # Required X11 development libraries (for Fyne + FFI)
 sudo apt-get update && sudo apt-get install -y \
@@ -111,18 +119,21 @@ sudo apt-get update && sudo apt-get install -y \
 ```
 
 **macOS:**
+
 ```bash
 # Install Xcode Command Line Tools
 xcode-select --install
 ```
 
 **Windows:**
+
 - MinGW-w64 or MSVC build tools
 - WebView2 Runtime (usually pre-installed on Windows 11)
 
 ### Key Dependencies
 
 **Go Dependencies (go.mod):**
+
 ```go
 module github.com/paradoxe35/myreviser
 
@@ -136,6 +147,7 @@ require (
 ```
 
 **Rust Dependencies (rust-ffi/Cargo.toml):**
+
 ```toml
 [dependencies]
 rdev = "0.5"          # Global hotkeys and input monitoring
@@ -161,6 +173,7 @@ crate-type = ["staticlib"]  # Static library for CGO linking
 ### Build with Rust FFI + Fyne
 
 **Quick Build (Current Platform):**
+
 ```bash
 # 1. Build Rust FFI library
 cd rust-ffi
@@ -178,6 +191,7 @@ make build  # Builds both Rust and Go
 ```
 
 **Platform-Specific Builds:**
+
 ```bash
 # Linux (must build on Linux)
 make build-rust-linux   # Builds Rust for Linux
@@ -193,6 +207,7 @@ CGO_ENABLED=1 fyne build -release -o bin/myreviser.exe
 ```
 
 **Important Notes:**
+
 - Each platform requires its own Rust static library build
 - CGO must be enabled for FFI integration
 - Use `fyne build -release` for optimized binaries (27% smaller)
@@ -201,6 +216,7 @@ CGO_ENABLED=1 fyne build -release -o bin/myreviser.exe
 ## Architecture Design
 
 ### File System Structure
+
 ```
 $HOME/.myreviser/
 ├── config.json                 # User configuration file
@@ -211,6 +227,7 @@ $HOME/.myreviser/
 ```
 
 ### Project Structure
+
 ```
 myreviser-go/
 ├── main.go                     # Application entry point, Fyne app setup
@@ -280,6 +297,7 @@ myreviser-go/
 ### Core Components
 
 #### 1. Single Instance Manager
+
 ```go
 // internal/instance/manager.go
 type InstanceManager struct {
@@ -299,6 +317,7 @@ func NewInstanceManager() (*InstanceManager, error) {
 ```
 
 #### 2. Revision Queue
+
 ```go
 // internal/revision/queue.go
 type RevisionQueue struct {
@@ -316,6 +335,7 @@ type RevisionTask struct {
 ```
 
 #### 3. AI Provider Interface
+
 ```go
 // internal/ai/provider.go
 type Provider interface {
@@ -330,6 +350,7 @@ type ProviderFactory struct {
 ```
 
 #### 4. FFI Hotkey Manager
+
 ```go
 // internal/input/ffi_hotkeys.go
 type FFIHotkeyManager struct {
@@ -348,6 +369,7 @@ func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()
 ```
 
 #### 5. Fyne Application Structure
+
 ```go
 // main.go
 package main
@@ -384,6 +406,7 @@ func main() {
 ```
 
 #### 6. Fyne System Tray Implementation
+
 ```go
 // ui/systray.go
 package ui
@@ -424,6 +447,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure (Week 1)
+
 - [x] Project setup with Fyne initialization
 - [x] Update go.mod with Fyne dependency
 - [ ] Implement single instance mechanism using file locks
@@ -433,6 +457,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 - [ ] Create settings storage system in ~/.myreviser/
 
 ### Phase 2: AI Provider Integration (Week 1-2)
+
 - [ ] Define AI provider trait
 - [ ] Implement OpenAI provider
 - [ ] Implement Claude Anthropic provider
@@ -441,6 +466,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 - [ ] Implement rate limiting
 
 ### Phase 3: Input Handling (Week 2)
+
 - [ ] Implement global hotkey registration
 - [ ] Create key simulation system
 - [ ] Implement clipboard management
@@ -449,6 +475,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 - [ ] Handle OS-specific key combinations
 
 ### Phase 4: Revision Processing (Week 2-3)
+
 - [ ] Implement revision queue
 - [ ] Create text processor
 - [ ] Add character limit validation
@@ -460,6 +487,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
   - Restore clipboard
 
 ### Phase 5: GUI Development (Week 3)
+
 - [ ] Design Fyne UI with native Go widgets
 - [ ] Create settings interface in main window using Fyne containers
 - [ ] Implement provider selection with `widget.Select`
@@ -471,6 +499,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 - [ ] Add real-time status updates with Fyne data binding
 
 ### Phase 6: System Integration (Week 3-4)
+
 - [ ] Implement Fyne system tray integration using `desktop.App` interface
 - [ ] Configure tray icon from assets (icon.ico/icon.png)
 - [ ] Add tray menu using Fyne API:
@@ -486,6 +515,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
   - Linux/macOS: icon.png
 
 ### Phase 7: Testing & Polish (Week 4)
+
 - [ ] Unit tests for core components
 - [ ] Integration tests
 - [ ] Cross-platform testing
@@ -496,6 +526,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 ## Detailed Workflows
 
 ### Revision Workflow - Select All
+
 1. **Hotkey Detection**: Listen for CTRL+ALT+SPACE (or OS variant)
 2. **State Check**: Ensure no revision in progress
 3. **Text Capture**:
@@ -519,6 +550,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
    - Clear revision state
 
 ### Revision Workflow - Selection
+
 1. **Hotkey Detection**: Listen for CTRL+WIN (or OS variant)
 2. **State Check**: Ensure no revision in progress
 3. **Text Capture**:
@@ -537,6 +569,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
 ## Security & Permissions
 
 ### Required Permissions
+
 - **Windows**:
   - Accessibility API access
   - Run as background service
@@ -550,6 +583,7 @@ func SetupSystemTray(desk desktop.App, mainWindow fyne.Window) {
   - Input device access (may require sudo)
 
 ### Security Considerations
+
 - Secure API key storage (OS keychain integration)
 - Memory cleanup for sensitive data
 - HTTPS only for API communications
@@ -626,6 +660,7 @@ func LogDir() string {
 ```
 
 ### Platform-Specific Hotkey Defaults
+
 ```go
 func GetPlatformHotkeys() HotkeyConfig {
     switch runtime.GOOS {
@@ -651,12 +686,14 @@ func GetPlatformHotkeys() HotkeyConfig {
 ## Error Handling Strategy
 
 ### User-Facing Errors
+
 - Toast notifications for revision failures
 - Clear error messages in settings GUI
 - Fallback to original text on failure
 - Retry mechanism with exponential backoff
 
 ### Internal Errors
+
 - Comprehensive logging with `tracing`
 - Error recovery strategies
 - Graceful degradation
@@ -675,6 +712,7 @@ func GetPlatformHotkeys() HotkeyConfig {
 ### Build Commands
 
 #### Development
+
 ```bash
 # Install Fyne command tools
 go install go install fyne.io/tools/cmd/fyne@latest
@@ -687,6 +725,7 @@ air
 ```
 
 #### Production Build
+
 ```bash
 # Build for current platform
 fyne package -os [darwin|linux|windows]
@@ -706,6 +745,7 @@ CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc \
 ```
 
 ### Makefile Build Automation
+
 ```makefile
 # Makefile
 .PHONY: build run clean package-all
@@ -733,6 +773,7 @@ package-all:
 ```
 
 ### Distribution Formats
+
 - **Windows**: NSIS installer (.exe), portable ZIP
 - **macOS**: DMG installer, .app bundle
 - **Linux**: AppImage, DEB package, RPM package, tar.gz
@@ -740,6 +781,7 @@ package-all:
 ## Fyne UI Implementation
 
 ### Data Models for UI Binding
+
 ```go
 // internal/models/models.go
 // These structs will be used with Fyne data binding
@@ -774,6 +816,7 @@ type StatusUpdate struct {
 ```
 
 ### Fyne UI Components
+
 ```go
 // ui/window.go
 package ui
@@ -834,6 +877,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 ```
 
 ### FFI Clipboard Operations
+
 ```go
 // internal/input/ffi_clipboard.go
 package input
@@ -888,6 +932,7 @@ func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
 ```
 
 ### FFI Hotkey Implementation
+
 ```go
 // internal/input/ffi_hotkeys.go
 package input
@@ -948,11 +993,13 @@ func hotkeyCallbackGateway(action *C.char) {
 ## GitHub Actions CI/CD
 
 ### Automated Release Workflow
+
 The project includes a comprehensive GitHub Actions workflow for automated multi-platform Fyne builds and releases.
 
 **Workflow Location**: `.github/workflows/build.yml` (in the project directory)
 
 #### Key Implementation Details:
+
 - Pure Go implementation with native UI widgets
 - Uses Fyne CLI (`go install fyne.io/tools/cmd/fyne@latest`) for building and packaging
 - Requires OpenGL and X11 dependencies for Linux
@@ -961,6 +1008,7 @@ The project includes a comprehensive GitHub Actions workflow for automated multi
 - Supports all major packaging formats (portable, installers, AppImage, DMG, etc.)
 
 #### Workflow Features:
+
 - **Multi-platform builds**: Linux (amd64/arm64), Windows (amd64/arm64), macOS (amd64/arm64)
 - **Automated packaging**:
   - Linux: Portable tar.gz, AppImage, .deb packages
@@ -972,394 +1020,14 @@ The project includes a comprehensive GitHub Actions workflow for automated multi
 - **Release automation**: Creates GitHub releases with checksums for all artifacts
 - **Triggers**: On push to main/develop, pull requests, tags, and manual dispatch
 
-#### Sample Workflow Configuration:
-
-```yaml
-name: Build and Release
-
-on:
-  push:
-    branches: [main, develop]
-    tags:
-      - "v*"
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      debug_enabled:
-        description: "Enable debug mode"
-        type: boolean
-        required: false
-        default: false
-
-env:
-  GO_VERSION: "1.24"
-
-jobs:
-  build:
-    name: Build - ${{ matrix.platform.name }}
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - name: Windows-x64
-            os: windows-latest
-            goos: windows
-            goarch: amd64
-            output: myreviser.exe
-
-          - name: macOS-x64
-            os: macos-latest
-            goos: darwin
-            goarch: amd64
-            output: myreviser
-
-          - name: macOS-arm64
-            os: macos-latest
-            goos: darwin
-            goarch: arm64
-            output: myreviser
-
-          - name: Linux-x64
-            os: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            output: myreviser
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Fyne
-        run: go install go install fyne.io/tools/cmd/fyne@latest
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgl1-mesa-dev xorg-dev \
-            libx11-dev libxkbfile-dev libxtst-dev \
-            libpng-dev libjpeg-dev \
-            libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev \
-            libxxf86vm-dev libxkbcommon-dev libxkbcommon-x11-dev
-
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        run: |
-          brew install create-dmg
-
-      - name: Install Windows dependencies
-        if: runner.os == 'Windows'
-        run: |
-          choco install mingw
-
-      - name: Bundle resources
-        run: |
-          fyne bundle -o bundled.go assets/icon.png
-
-      - name: Build application
-        env:
-          CGO_ENABLED: 1
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          go build -ldflags "-s -w" -o ${{ matrix.output }}
-
-      - name: Package with Fyne
-        run: |
-          fyne package -os ${{ matrix.goos }} -icon assets/icon.png
-
-      - name: Package Windows
-        if: runner.os == 'Windows'
-        run: |
-          # Create portable ZIP
-          mkdir dist
-          cp myreviser.exe dist/
-          cp assets/icon.ico dist/
-          Compress-Archive -Path dist/* -DestinationPath myreviser-windows-portable.zip
-
-          # Rename Fyne package output
-          if (Test-Path "MyReviser.exe") {
-            Move-Item -Path "MyReviser.exe" -Destination "myreviser-windows-setup.exe"
-          }
-
-      - name: Package macOS
-        if: runner.os == 'macOS'
-        run: |
-          # Create app bundle if not created by Fyne
-          if [ ! -d "MyReviser.app" ]; then
-            mkdir -p MyReviser.app/Contents/MacOS
-            mkdir -p MyReviser.app/Contents/Resources
-            cp myreviser MyReviser.app/Contents/MacOS/
-            cp assets/icon.png MyReviser.app/Contents/Resources/
-          fi
-
-          # Sign the app (if certificates available)
-          # codesign --deep --force --verify --verbose --sign "Developer ID Application" MyReviser.app
-
-          # Create DMG
-          create-dmg \
-            --volname "MyReviser" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "MyReviser.app" 175 120 \
-            --hide-extension "MyReviser.app" \
-            --app-drop-link 425 120 \
-            "myreviser-macos-${{ matrix.goarch }}.dmg" \
-            "."
-
-      - name: Package Linux
-        if: runner.os == 'Linux'
-        run: |
-          # Create AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage
-
-          mkdir -p AppDir/usr/bin
-          cp myreviser AppDir/usr/bin/
-          cp assets/icon.png AppDir/myreviser.png
-
-          cat > AppDir/myreviser.desktop <<EOF
-          [Desktop Entry]
-          Name=MyReviser
-          Exec=myreviser
-          Icon=myreviser
-          Type=Application
-          Categories=Utility;
-          EOF
-
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          mv *.AppImage myreviser-linux.AppImage
-
-          # Create tarball
-          tar -czf myreviser-linux.tar.gz myreviser assets/icon.png
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: myreviser-${{ matrix.platform.name }}
-          path: |
-            myreviser-*.exe
-            myreviser-*.zip
-            myreviser-*.dmg
-            myreviser-*.AppImage
-            myreviser-*.tar.gz
-            MyReviser.app
-            myreviser
-
-  create-linux-packages:
-    name: Create Linux Packages
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: myreviser-Linux-x64
-
-      - name: Extract binary
-        run: tar -xzf myreviser-linux.tar.gz
-
-      - name: Create DEB package
-        run: |
-          # Create debian package structure
-          mkdir -p debian/DEBIAN
-          mkdir -p debian/usr/local/bin
-          mkdir -p debian/usr/share/applications
-          mkdir -p debian/usr/share/icons/hicolor/256x256/apps
-
-          # Copy files
-          cp myreviser debian/usr/local/bin/
-          chmod +x debian/usr/local/bin/myreviser
-          cp assets/icon.png debian/usr/share/icons/hicolor/256x256/apps/myreviser.png
-
-          # Create desktop entry
-          cat > debian/usr/share/applications/myreviser.desktop << EOF
-          [Desktop Entry]
-          Name=MyReviser
-          Comment=AI-powered text revision tool
-          Exec=/usr/local/bin/myreviser
-          Icon=myreviser
-          Terminal=false
-          Type=Application
-          Categories=Utility;TextEditor;
-          StartupNotify=true
-          EOF
-
-          # Create control file
-          VERSION=${GITHUB_REF#refs/tags/v}
-          cat > debian/DEBIAN/control << EOF
-          Package: myreviser
-          Version: ${VERSION:-1.0.0}
-          Architecture: amd64
-          Maintainer: Your Name <paradoxngwasi@gmail.com>
-          Depends: libgtk-3-0, libwebkit2gtk-4.0-37
-          Section: utils
-          Priority: optional
-          Description: AI-powered text revision tool
-           MyReviser is a cross-platform text revision tool that uses AI
-           to fix grammar, improve clarity, and enhance text quality.
-          EOF
-
-          # Add post-install script for dependencies
-          cat > debian/DEBIAN/postinst << EOF
-          #!/bin/sh
-          set -e
-
-          # Update icon cache
-          if which gtk-update-icon-cache > /dev/null 2>&1; then
-              gtk-update-icon-cache -f /usr/share/icons/hicolor
-          fi
-
-          exit 0
-          EOF
-          chmod 755 debian/DEBIAN/postinst
-
-          # Build DEB
-          dpkg-deb --build debian myreviser_${VERSION:-1.0.0}_amd64.deb
-
-      - name: Create RPM package
-        run: |
-          # Install rpm tools
-          sudo apt-get install -y rpm
-
-          # Create RPM structure
-          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
-          VERSION=${GITHUB_REF#refs/tags/v}
-
-          # Create spec file
-          cat > rpmbuild/SPECS/myreviser.spec << EOF
-          Name:           myreviser
-          Version:        ${VERSION:-1.0.0}
-          Release:        1%{?dist}
-          Summary:        AI-powered text revision tool
-          License:        MIT
-
-          %description
-          MyReviser is a cross-platform text revision tool that uses AI
-          to fix grammar, improve clarity, and enhance text quality.
-
-          %files
-          /usr/local/bin/myreviser
-          /usr/share/applications/myreviser.desktop
-          /usr/share/icons/hicolor/256x256/apps/myreviser.png
-
-          %changelog
-          * $(date +"%a %b %d %Y") Your Name <paradoxngwasi@gmail.com> - ${VERSION:-1.0.0}-1
-          - Initial package release
-          EOF
-
-          # Build RPM (simplified for CI)
-          # Note: Full RPM build would require more setup
-
-      - name: Upload Linux packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: myreviser-linux-packages
-          path: |
-            myreviser_*.deb
-            myreviser-*.AppImage
-
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [build, create-linux-packages]
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          title: MyReviser ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          files: |
-            **/*.exe
-            **/*.zip
-            **/*.dmg
-            **/*.AppImage
-            **/*.tar.gz
-            **/*.deb
-          body: |
-            # MyReviser ${{ github.ref_name }}
-
-            AI-powered text revision tool built with Go and Fyne.
-
-            ## 📥 Downloads
-
-            ### Windows
-            - **Installer**: `myreviser-windows-setup.exe` (Recommended)
-            - **Portable**: `myreviser-windows-portable.zip` (No installation required)
-
-            ### macOS
-            - **DMG**: `myreviser-macos.dmg` (Intel & Apple Silicon Universal)
-
-            ### Linux
-            - **AppImage**: `myreviser-linux.AppImage` (Universal, no installation)
-            - **DEB**: `myreviser_*.deb` (Debian/Ubuntu)
-            - **Archive**: `myreviser-linux.tar.gz` (Manual installation)
-
-            ## 🚀 Installation
-
-            ### Windows
-            Run the installer or extract the portable ZIP.
-
-            ### macOS
-            Open the DMG and drag MyReviser to Applications.
-            You may need to allow the app in System Settings > Privacy & Security.
-
-            ### Linux
-            ```bash
-            # AppImage (recommended)
-            chmod +x myreviser-linux.AppImage
-            ./myreviser-linux.AppImage
-
-            # Debian/Ubuntu
-            sudo dpkg -i myreviser_*.deb
-            sudo apt-get install -f  # Install dependencies if needed
-
-            # Manual
-            tar -xzf myreviser-linux.tar.gz
-            chmod +x myreviser
-            sudo mv myreviser /usr/local/bin/
-            ```
-
-            ## ⚙️ Requirements
-
-            ### Permissions Required:
-            - **Windows**: Run as administrator on first launch
-            - **macOS**: Accessibility and Input Monitoring permissions
-            - **Linux**: X11 access for global hotkeys
-
-            ## 📝 Configuration
-
-            Settings are stored in:
-            - Windows: `%USERPROFILE%\.myreviser\config.json`
-            - macOS: `~/.myreviser/config.json`
-            - Linux: `~/.myreviser/config.json`
-
-```
-
 ### Build Dependencies
 
 #### Fyne + Rust FFI Requirements
+
 Both Fyne GUI and Rust FFI require CGO:
 
 **Linux:**
+
 ```bash
 # Ubuntu/Debian - Fyne + X11 + Rust FFI dependencies
 sudo apt-get install -y \
@@ -1374,23 +1042,28 @@ sudo apt-get install -y \
 ```
 
 **Windows:**
+
 - MinGW-w64 or MSVC build tools (for CGO)
 - Rust toolchain with `x86_64-pc-windows-gnu` target
 - No additional permissions required
 
 **macOS:**
+
 - Xcode Command Line Tools
 - Rust toolchain
 - Requires Accessibility permissions in System Preferences for global hotkeys
 
 ### Release Process
+
 1. **Version Tagging**:
+
    ```bash
    git tag v1.0.0
    git push origin v1.0.0
    ```
 
 2. **Automatic Build**: GitHub Actions will:
+
    - Build for all platforms using Fyne
    - Create platform-specific packages
    - Generate AppImage and Debian packages for Linux
@@ -1401,6 +1074,7 @@ sudo apt-get install -y \
 ### Local Development with Fyne
 
 #### Quick Start
+
 ```bash
 # Clone repository
 git clone https://github.com/paradoxe35/myreviser.git
@@ -1421,6 +1095,7 @@ air
 ```
 
 #### Testing System Tray
+
 ```bash
 # Run with system tray support
 go run . -systray
@@ -1429,6 +1104,7 @@ go run . -systray
 ### Documentation Resources
 
 **Important**: Always refer to the latest Fyne documentation using Context7:
+
 - Library ID: `/fyne-io/docs.fyne.io`
 - Topics to explore:
   - System tray implementation
@@ -1519,6 +1195,7 @@ func GetLogDirectory() string {
 ```
 
 This feature provides:
+
 - Quick access to logs for debugging
 - Platform-specific implementation for Windows, macOS, and Linux
 - Fallback to opening logs directory if file opening fails
@@ -1527,18 +1204,21 @@ This feature provides:
 ## Testing Strategy
 
 ### Unit Tests
+
 - AI provider implementations
 - Text processing logic
 - Configuration management
 - Hotkey parsing
 
 ### Integration Tests
+
 - End-to-end revision workflow
 - Multi-provider switching
 - Clipboard operations
 - Settings persistence
 
 ### Manual Testing Checklist
+
 - [ ] All hotkey combinations
 - [ ] Each AI provider
 - [ ] Various text lengths
@@ -1550,18 +1230,21 @@ This feature provides:
 ## Future Enhancements
 
 ### Version 1.1
+
 - Custom AI models support
 - Batch text processing
 - Revision history
 - Undo/redo functionality
 
 ### Version 1.2
+
 - Browser extension integration
 - Mobile companion app
 - Cloud sync for settings
 - Custom revision profiles
 
 ### Version 2.0
+
 - Local LLM support
 - Voice-to-text revision
 - Real-time collaboration
@@ -1577,6 +1260,7 @@ This feature provides:
 ## Technical Implementation Details
 
 ### FFI Clipboard Operations Example
+
 ```go
 // Using Rust FFI via arboard
 import "C"
@@ -1611,6 +1295,7 @@ func captureAndReplace() {
 ```
 
 ### Fyne Data Binding Example
+
 ```go
 // Using Fyne's data binding for reactive UI
 package ui
@@ -1655,6 +1340,7 @@ func CreateSettingsForm(config *Config) fyne.CanvasObject {
 ```
 
 ### Fyne Shortcuts and Hotkeys
+
 ```go
 // internal/input/shortcuts.go
 package input
@@ -1691,6 +1377,7 @@ func RegisterShortcuts(window fyne.Window) {
 ```
 
 ### Fyne Resource Bundling
+
 ```go
 // Generate resource bundle from assets
 // Run: fyne bundle -o bundled.go assets/icon.png
@@ -1714,6 +1401,7 @@ func main() {
 ```
 
 ### Fyne Preferences System
+
 ```go
 // Using Fyne's built-in preferences
 package config
@@ -1749,6 +1437,7 @@ func (c *ConfigManager) GetProvider() string {
 ```
 
 ### Fyne Build Metadata
+
 ```go
 // FyneApp.toml - Fyne application metadata
 [Details]
@@ -1760,6 +1449,7 @@ Build = 1
 ```
 
 ### Platform-Specific Build Scripts
+
 ```bash
 #!/bin/bash
 # build.sh - Multi-platform build script
@@ -1792,12 +1482,14 @@ fyne package -os linux -icon assets/icon.png
 ## Success Metrics
 
 - **Performance**:
+
   - Revision latency < 3 seconds
   - Memory usage < 80MB active, < 40MB idle (Fyne is lightweight)
   - CPU usage < 5% active, < 1% idle
   - Startup time < 1 second (native Go binary)
 
 - **Reliability**:
+
   - 99.9% revision success rate
   - Graceful error handling
   - Automatic recovery from failures
@@ -1812,6 +1504,7 @@ fyne package -os linux -icon assets/icon.png
 ## Phase 8: UI/UX Improvements & Fixes (Completed)
 
 ### Improvements Implemented:
+
 - [x] Move single instance lock file to `~/.myscript/` directory (not `.myreviser`)
 - [x] Fix window max width issue - prevent infinite expansion when displaying errors
 - [x] Add proper spacing/padding between UI elements for professional look
@@ -1833,16 +1526,19 @@ fyne package -os linux -icon assets/icon.png
 ### Technical Details:
 
 #### 1. Lock File Location Fix
+
 - Current: Creates lock in system temp directory
 - Required: Create lock in `$HOME/.myscript/myscript.lock`
 - Update single instance manager initialization
 
 #### 2. Window Size Constraints
+
 - Add maximum width constraint to prevent overflow
 - Implement proper text wrapping for error messages
 - Use scrollable containers where needed
 
 #### 3. UI Spacing & Layout
+
 ```go
 // Standard spacing constants
 const (
@@ -1853,9 +1549,11 @@ const (
 ```
 
 #### 4. Hotkey Capture Widget ✅
+
 **Implemented in `ui/hotkey_capture.go`**
 
 Features:
+
 - Custom Fyne widget using native keyboard events (no external dependencies)
 - Click "Capture" button to start listening
 - Displays pressed keys as they are detected in real-time
@@ -1868,6 +1566,7 @@ Features:
 - Sorted modifier display (ctrl+alt+shift+key format)
 
 Key mapping includes:
+
 - All modifiers (Ctrl, Alt, Shift, Super/Win/Cmd)
 - Letters (a-z)
 - Numbers (0-9)
@@ -1878,9 +1577,11 @@ Key mapping includes:
 **Note:** Uses Fyne's built-in keyboard event system for UI capture. System-wide hotkey listening is handled via Rust FFI (rdev) in `internal/input/ffi_hotkeys.go`.
 
 #### 5. Build Optimization
+
 Current binary size: ~42 MB
 
 Optimization strategies:
+
 - Use `-ldflags="-s -w"` for stripping debug info
 - Investigate UPX compression (may reduce to ~15-20 MB)
 - Remove unused dependencies
@@ -1890,6 +1591,7 @@ Optimization strategies:
 Expected size after optimization: ~20-25 MB
 
 #### 6. Makefile Updates
+
 ```makefile
 # Add CGO_ENABLED=1 to all build targets
 # Change output directory to ./bin/
@@ -1898,6 +1600,7 @@ build:
 ```
 
 #### 7. Provider-Specific Field Management
+
 ```go
 // Show/hide fields based on selected provider
 providerSelect.OnChanged = func(value string) {
@@ -1914,6 +1617,7 @@ providerSelect.OnChanged = func(value string) {
 ## Future Enhancements
 
 ### Version 1.1
+
 - Custom AI models support
 - Batch text processing
 - Revision history with undo/redo
@@ -1921,21 +1625,25 @@ providerSelect.OnChanged = func(value string) {
 - Multiple revision profiles
 
 ### Version 1.2
+
 - Browser extension integration via native messaging
 - Cloud sync for settings
 - Custom prompt templates library
 - Statistics dashboard
 
 ### Version 2.0
+
 - Local LLM support (Ollama integration)
 - Voice-to-text revision
 - Plugin system for custom processors
 - Team collaboration features
+
 ## Implementation Status (Current)
 
 ### ✅ Completed Features
 
 #### Rust FFI Integration (October 2025)
+
 - [x] Rust FFI library with cbindgen bindings
 - [x] Static library compilation for all platforms
 - [x] FFI wrappers in Go (CGO)
@@ -1948,6 +1656,7 @@ providerSelect.OnChanged = func(value string) {
 - [x] Comprehensive FFI safety documentation
 
 #### Build System
+
 - [x] Makefile with Rust + Go build targets
 - [x] Fyne CLI integration with -release flag
 - [x] GitHub Actions CI/CD for multi-platform builds
@@ -1955,6 +1664,7 @@ providerSelect.OnChanged = func(value string) {
 - [x] Platform-specific builds (Linux AMD64, macOS AMD64/ARM64, Windows AMD64)
 
 #### Core Application
+
 - [x] Fyne UI with system tray integration
 - [x] Multi-provider AI support (OpenAI, Claude, Gemini)
 - [x] Custom hotkey capture widget
