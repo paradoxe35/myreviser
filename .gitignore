@@ -30,6 +30,7 @@ myreviser.exe
 *.tar.gz
 *.tar.xz
 *.zip
+.gocache
 MyReviser.app
 
 # Fyne bundled resources

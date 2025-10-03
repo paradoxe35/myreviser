@@ -16,6 +16,7 @@ import (
 	"github.com/paradoxe35/myreviser/internal/config"
 	"github.com/paradoxe35/myreviser/internal/input"
 	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/permissions"
 )
 
 const (
@@ -29,9 +30,13 @@ const (
 
 type MainWindow struct {
 	fyne.Window
-	app           fyne.App
-	config        *config.Config
-	hotkeyManager *input.FFIHotkeyManager
+	app                 fyne.App
+	config              *config.Config
+	hotkeyManager       *input.FFIHotkeyManager
+	permissionPrompt    *permissionPrompt
+	rootContainer       *fyne.Container
+	mainContent         fyne.CanvasObject
+	permissionContainer fyne.CanvasObject
 
 	// Data bindings
 	providerBinding        binding.String
@@ -63,11 +68,14 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHot
 
 	window.CenterOnScreen()
 
+	prompt := newPermissionPrompt()
+
 	mw := &MainWindow{
-		Window:        window,
-		app:           app,
-		config:        cfg,
-		hotkeyManager: hotkeyManager,
+		Window:           window,
+		app:              app,
+		config:           cfg,
+		hotkeyManager:    hotkeyManager,
+		permissionPrompt: prompt,
 	}
 
 	// Initialize data bindings
@@ -80,9 +88,12 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHot
 	}
 	mw.applyTheme(themeName)
 
-	// Create and set content
-	content := mw.createContent()
-	window.SetContent(content)
+	// Create and set content containers
+	mw.mainContent = mw.createContent()
+	mw.permissionContainer = mw.permissionPrompt.canvasObject()
+	mw.rootContainer = container.NewStack(mw.mainContent, mw.permissionContainer)
+	window.SetContent(mw.rootContainer)
+	mw.showMainContent()
 
 	// Hide window if start minimized and not first run
 	if cfg.Appearance.StartMinimized && !cfg.Meta.FirstRun {
@@ -124,6 +135,47 @@ func (w *MainWindow) initBindings() {
 		theme = "auto"
 	}
 	w.themeBinding.Set(theme)
+}
+
+// SetPermissionState updates the permission prompt visibility and messaging.
+func (w *MainWindow) SetPermissionState(state permissions.State, showRestart bool) {
+	if w.permissionPrompt == nil {
+		return
+	}
+
+	w.permissionPrompt.update(state, showRestart)
+
+	if !state.AllGranted() || showRestart {
+		w.showPermissionContent()
+	} else {
+		w.showMainContent()
+	}
+}
+
+func (w *MainWindow) showPermissionContent() {
+	if w.permissionContainer != nil {
+		w.permissionContainer.Show()
+	}
+	if w.mainContent != nil {
+		w.mainContent.Hide()
+	}
+	if w.rootContainer != nil {
+		w.rootContainer.Objects = []fyne.CanvasObject{w.mainContent, w.permissionContainer}
+		w.rootContainer.Refresh()
+	}
+}
+
+func (w *MainWindow) showMainContent() {
+	if w.mainContent != nil {
+		w.mainContent.Show()
+	}
+	if w.permissionContainer != nil {
+		w.permissionContainer.Hide()
+	}
+	if w.rootContainer != nil {
+		w.rootContainer.Objects = []fyne.CanvasObject{w.permissionContainer, w.mainContent}
+		w.rootContainer.Refresh()
+	}
 }
 
 // loadProviderSettings loads settings for a specific provider into the UI

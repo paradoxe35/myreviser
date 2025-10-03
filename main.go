@@ -62,23 +62,6 @@ func main() {
 
 	logger.Info("MyReviser starting", "version", Version, "build_time", BuildTime)
 
-	// Check accessibility permissions (macOS only)
-	hasAccessibility := checkAccessibilityPermissions()
-	hasInputMonitoring := checkInputMonitoringPermissions()
-
-	if !hasAccessibility || !hasInputMonitoring {
-		logger.Warn("MyReviser requires permissions to function properly:")
-		if !hasAccessibility {
-			logger.Warn("  ❌ Accessibility - Required for text input/clipboard")
-		}
-		if !hasInputMonitoring {
-			logger.Warn("  ❌ Input Monitoring - Required for global hotkeys")
-		}
-		logger.Warn("Please grant all permissions in System Settings and restart the app.")
-	} else {
-		logger.Info("All required permissions granted ✓")
-	}
-
 	// Create and start the application
 	application, err := NewApplication(myApp, cfg)
 	if err != nil {

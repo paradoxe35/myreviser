@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
 	"github.com/paradoxe35/myreviser/internal/config"
 	"github.com/paradoxe35/myreviser/internal/input"
 	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/permissions"
 	"github.com/paradoxe35/myreviser/internal/revision"
 	"github.com/paradoxe35/myreviser/ui"
 )
@@ -20,6 +23,9 @@ type Application struct {
 	hotkeyManager *input.FFIHotkeyManager
 	processor     *revision.Processor
 	notifications *ui.NotificationManager
+
+	permissionMonitorCancel    context.CancelFunc
+	permissionsMissingOnLaunch bool
 }
 
 // NewApplication creates a new application instance
@@ -50,6 +56,9 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 		processor:     processor,
 		notifications: notifications,
 	}
+
+	// Setup permission monitoring before hotkeys to update the UI early
+	application.setupPermissions()
 
 	// Setup hotkeys
 	application.setupHotkeys()
@@ -158,6 +167,74 @@ func (a *Application) reloadHotkeysFromConfig() {
 		"selection", a.config.Hotkeys.Selection)
 }
 
+// setupPermissions initialises macOS permission handling and keeps the UI in sync.
+func (a *Application) setupPermissions() {
+	state := permissions.CurrentState()
+	supported := permissions.IsSupported()
+	missingOnLaunch := supported && !state.AllGranted()
+
+	a.permissionsMissingOnLaunch = missingOnLaunch
+	a.mainWindow.SetPermissionState(state, missingOnLaunch)
+
+	if !supported {
+		return
+	}
+
+	if missingOnLaunch {
+		logger.Warn("macOS permissions required for full functionality")
+		for _, perm := range state.Missing() {
+			logger.Warn("permission pending", "name", perm.DisplayName())
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		a.permissionMonitorCancel = cancel
+		go a.monitorPermissions(ctx, state)
+	} else {
+		logger.Info("All required macOS permissions granted")
+	}
+}
+
+func (a *Application) monitorPermissions(ctx context.Context, previous permissions.State) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			state := permissions.CurrentState()
+
+			if state.AccessibilityGranted != previous.AccessibilityGranted {
+				if state.AccessibilityGranted {
+					logger.Info("Accessibility permission granted")
+				} else {
+					logger.Warn("Accessibility permission revoked")
+				}
+			}
+
+			if state.InputMonitoringGranted != previous.InputMonitoringGranted {
+				if state.InputMonitoringGranted {
+					logger.Info("Input Monitoring permission granted")
+				} else {
+					logger.Warn("Input Monitoring permission revoked")
+				}
+			}
+
+			if state != previous {
+				fyne.Do(func() {
+					a.mainWindow.SetPermissionState(state, a.permissionsMissingOnLaunch)
+				})
+				previous = state
+			}
+
+			if state.AllGranted() {
+				return
+			}
+		}
+	}
+}
+
 // Start starts the application
 func (a *Application) Start() error {
 	// Start hotkey manager
@@ -167,8 +244,11 @@ func (a *Application) Start() error {
 
 	logger.Info("Application started successfully")
 
-	// Show window if first run, or if not set to start minimized
-	if a.config.Meta.FirstRun || !a.config.Appearance.StartMinimized {
+	// Show window if permissions are pending, it's first run, or not set to start minimized
+	if a.permissionsMissingOnLaunch {
+		a.mainWindow.ShowWindow()
+		logger.Info("Showing permissions screen", "permissions_pending", true)
+	} else if a.config.Meta.FirstRun || !a.config.Appearance.StartMinimized {
 		a.mainWindow.ShowWindow() // Shows window and Dock icon
 		// Mark first run complete and persist
 		if a.config.Meta.FirstRun {
@@ -191,6 +271,10 @@ func (a *Application) Start() error {
 // Stop stops the application
 func (a *Application) Stop() {
 	logger.Info("Stopping application")
+
+	if a.permissionMonitorCancel != nil {
+		a.permissionMonitorCancel()
+	}
 
 	// Stop and close FFI hotkey manager
 	if a.hotkeyManager != nil {
