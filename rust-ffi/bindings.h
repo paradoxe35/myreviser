@@ -25,6 +25,14 @@ typedef void (*HotkeyCallback)(const char*);
 
 typedef void *SimulatorHandle;
 
+extern void *CGEventCreateKeyboardEvent(void *source, uint16_t virtual_key, bool key_down);
+
+extern void CGEventSetFlags(void *event, uint64_t flags);
+
+extern void CGEventPost(uint32_t tap, void *event);
+
+extern void CFRelease(void *cf);
+
 /**
  * Get the last error message
  * Returns: C string (must be freed with myreviser_free_string) or NULL if no error

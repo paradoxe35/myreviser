@@ -379,7 +379,6 @@ clean:
 	rm -rf $(RUST_FFI_DIR)/target
 	rm -f $(RUST_FFI_DIR)/bindings.h
 	rm -rf build/ dist/
-	rm -f bundled.go
 	rm -f *.AppImage *.dmg *.deb
 	@echo "Clean complete!"
 

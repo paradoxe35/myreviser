@@ -12,7 +12,8 @@ crate-type = ["staticlib"]  # Static library for Go CGO
 
 [dependencies]
 # Core dependencies for system input
-rdev = "0.5"          # Global hotkeys and input monitoring
+# Use rustdesk fork which fixes macOS GUI compatibility issues (event tap conflicts with Fyne)
+rdev = { git = "https://github.com/rustdesk-org/rdev" }
 arboard = "3.6"       # Clipboard management
 enigo = "0.6"         # Keyboard/mouse simulation
 
