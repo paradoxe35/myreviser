@@ -12,7 +12,7 @@
 #
 # =============================================================================
 
-.PHONY: build run clean test install-deps help examples
+.PHONY: build run clean test install-deps help examples bundle-assets ensure-fyne
 .PHONY: build-rust build-rust-linux build-rust-darwin build-rust-darwin-amd64 build-rust-darwin-arm64 build-rust-windows
 .PHONY: build-go package-all lint fmt update-deps dev dev-quick
 .PHONY: clean-rust clean-go ci-setup ci-build ci-test ci-package verify-static
@@ -230,18 +230,27 @@ build-rust-windows:
 	@echo "Windows Rust FFI library built!"
 
 # ============================================================================
+# Resource Bundling
+# ============================================================================
+bundle-assets: ensure-fyne
+	@echo "Embedding UI assets..."
+	fyne bundle --package main --output bundled.go assets/icon.png
+
+ensure-fyne:
+	@command -v fyne >/dev/null 2>&1 || { \
+		echo "Installing Fyne CLI..."; \
+		go install fyne.io/tools/cmd/fyne@latest; \
+	}
+
+# ============================================================================
 # Build Go Application
 # ============================================================================
-build-go:
+build-go: bundle-assets ensure-fyne
 	@echo "Building Go application with Fyne for $(CURRENT_OS)..."
 	@mkdir -p $(BIN_DIR)
 	@test -f $(LIB_DIR)/libmyreviser_ffi.a || { \
 		echo "Error: Rust FFI library not found. Run 'make build-rust' first."; \
 		exit 1; \
-	}
-	@command -v fyne >/dev/null 2>&1 || { \
-		echo "Installing Fyne CLI..."; \
-		go install go install fyne.io/tools/cmd/fyne@latest; \
 	}
 	CGO_ENABLED=1 \
 	CC=$(CC) \
