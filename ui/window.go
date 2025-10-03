@@ -331,6 +331,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	apiKeyEntry := widget.NewPasswordEntry()
 	apiKeyEntry.Bind(w.apiKeyBinding)
 	apiKeyEntry.PlaceHolder = "Enter your API key"
+	apiKeyEntry.Validator = nil // Disable validation icon
 
 	// Model section
 	modelLabel := widget.NewLabel("Model:")
@@ -338,6 +339,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
 	modelEntry.PlaceHolder = "e.g., gpt-4o (optional)"
+	modelEntry.Validator = nil // Disable validation icon
 
 	// Base URL section (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL:")
@@ -345,6 +347,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	w.baseURLEntry = widget.NewEntry()
 	w.baseURLEntry.Bind(w.baseURLBinding)
 	w.baseURLEntry.PlaceHolder = "https://api.openai.com/v1 (optional)"
+	w.baseURLEntry.Validator = nil // Disable validation icon
 
 	// Create Base URL container for visibility control
 	w.baseURLContainer = container.NewVBox(
