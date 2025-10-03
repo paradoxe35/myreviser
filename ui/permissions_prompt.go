@@ -20,40 +20,39 @@ type permissionPrompt struct {
 }
 
 func newPermissionPrompt() *permissionPrompt {
-	title := widget.NewLabelWithStyle("macOS Permissions Required", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle("Permissions Required", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
-	info := widget.NewLabel("Grant these permissions so MyReviser can listen for shortcuts and automate edits.")
+	info := widget.NewLabel("MyReviser needs the following permissions to function properly.")
 	info.Wrapping = fyne.TextWrapWord
 
-	accessibilityButton := newPermissionButton("Open Settings", func() {
+	accessibilityButton := newPermissionButton("Grant Access", func() {
 		permissions.RequestPermission(permissions.Accessibility)
 		permissions.OpenPreference(permissions.Accessibility)
 	})
 
 	accessibilitySection := buildPermissionRow(
 		"Accessibility",
-		"Needed to control the keyboard and clipboard during revisions.",
+		"Required to automate keyboard input and clipboard operations.",
 		accessibilityButton,
 	)
 
-	inputMonitoringButton := newPermissionButton("Open Settings", func() {
+	inputMonitoringButton := newPermissionButton("Grant Access", func() {
 		permissions.OpenPreference(permissions.InputMonitoring)
 	})
 
 	inputMonitoringSection := buildPermissionRow(
 		"Input Monitoring",
-		"Allows MyReviser to detect global shortcuts while running in the background.",
+		"Required to detect global keyboard shortcuts in the background.",
 		inputMonitoringButton,
 	)
 
-	restartNotice := widget.NewLabelWithStyle(
-		"Permissions granted. Quit and reopen MyReviser to finish applying them.",
-		fyne.TextAlignLeading,
-		fyne.TextStyle{Bold: true},
-	)
+	restartNotice := widget.NewLabel("All permissions granted. Please restart the application to apply changes.")
 	restartNotice.Wrapping = fyne.TextWrapWord
+	restartNotice.TextStyle = fyne.TextStyle{Bold: true}
 
-	restartRow := container.NewHBox(widget.NewIcon(theme.ConfirmIcon()), restartNotice)
+	restartIcon := widget.NewIcon(theme.ConfirmIcon())
+	restartTextContainer := container.NewMax(restartNotice)
+	restartRow := container.NewBorder(nil, nil, restartIcon, nil, restartTextContainer)
 	restartRow.Hide()
 
 	dividerAbove := widget.NewSeparator()
@@ -63,6 +62,7 @@ func newPermissionPrompt() *permissionPrompt {
 	body := container.NewVBox(
 		title,
 		info,
+		widget.NewLabel(""), // spacing
 		dividerAbove,
 		accessibilitySection,
 		inputMonitoringSection,
@@ -107,15 +107,16 @@ func (p *permissionPrompt) update(state permissions.State, showRestart bool) {
 
 	switch {
 	case hasPending:
-		p.infoLabel.SetText("Grant these permissions so MyReviser can listen for shortcuts and automate edits.")
+		p.infoLabel.SetText("MyReviser needs the following permissions to function properly.")
 		p.dividerAboveList.Show()
 		p.dividerBelowList.Hide()
 		p.restartRow.Hide()
 		p.root.Show()
 	case showRestart:
-		p.infoLabel.SetText("All permissions are enabled. Please restart MyReviser to complete the update.")
+		p.infoLabel.SetText("All permissions granted.")
 		p.dividerAboveList.Hide()
 		p.dividerBelowList.Show()
+		p.restartNotice.SetText("All permissions granted. Please restart the application to apply changes.")
 		p.restartRow.Show()
 		p.root.Show()
 	default:
@@ -132,10 +133,10 @@ func buildPermissionRow(title, description string, button *widget.Button) fyne.C
 	descriptionLabel.Wrapping = fyne.TextWrapWord
 
 	textColumn := container.NewVBox(titleLabel, descriptionLabel)
-	textColumn.Resize(fyne.NewSize(380, textColumn.MinSize().Height))
 
-	row := container.NewBorder(nil, nil, textColumn, button, nil)
-	return container.NewVBox(row)
+	// Use HBox with layout that allows text to expand
+	row := container.NewBorder(nil, nil, nil, button, textColumn)
+	return container.NewPadded(row)
 }
 
 func newPermissionButton(label string, tapped func()) *widget.Button {
