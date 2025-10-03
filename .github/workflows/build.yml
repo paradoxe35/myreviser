@@ -425,6 +425,7 @@ jobs:
           $version = "${{ github.ref_name }}" -replace '^v','' -replace '[^0-9a-zA-Z.]','-'
           if ([string]::IsNullOrEmpty($version)) { $version = "0.0.0-dev" }
 
+          # Create NSIS installer script
           @"
           Unicode true
           !include "MUI2.nsh"
@@ -536,7 +537,7 @@ jobs:
           FunctionEnd
 
           Function EnableAutoStart
-            WriteRegStr HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}" "\"`$INSTDIR\myreviser.exe\""
+            WriteRegStr HKCU "`${PRODUCT_AUTORUN_KEY}" "`${PRODUCT_NAME}" '"`$INSTDIR\myreviser.exe"'
           FunctionEnd
 
           Function DisableAutoStart
@@ -567,7 +568,7 @@ jobs:
             nsExec::ExecToStack 'taskkill /F /IM myreviser.exe'
             Pop `$0
           FunctionEnd
-          "@ | Out-File -Encoding UTF8 installer.nsi
+          "@ | Out-File -FilePath installer.nsi -Encoding UTF8
 
           Write-Host "NSIS script created, contents:"
           Get-Content installer.nsi | Select-Object -First 20
