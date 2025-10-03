@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -26,6 +27,10 @@ type Application struct {
 
 	permissionMonitorCancel    context.CancelFunc
 	permissionsMissingOnLaunch bool
+
+	reloadMutex    sync.Mutex
+	lastReloadTime time.Time
+	reloadDebounce time.Duration
 }
 
 // NewApplication creates a new application instance
@@ -49,12 +54,13 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	mainWindow := ui.NewMainWindow(app, cfg, hotkeyManager)
 
 	application := &Application{
-		app:           app,
-		mainWindow:    mainWindow,
-		config:        cfg,
-		hotkeyManager: hotkeyManager,
-		processor:     processor,
-		notifications: notifications,
+		app:            app,
+		mainWindow:     mainWindow,
+		config:         cfg,
+		hotkeyManager:  hotkeyManager,
+		processor:      processor,
+		notifications:  notifications,
+		reloadDebounce: 500 * time.Millisecond, // Debounce rapid reloads
 	}
 
 	// Setup permission monitoring before hotkeys to update the UI early
@@ -134,34 +140,37 @@ func (a *Application) setupHotkeys() {
 
 // reloadHotkeysFromConfig stops current hotkeys and re-registers with new config
 func (a *Application) reloadHotkeysFromConfig() {
+	// Debounce rapid reload calls
+	a.reloadMutex.Lock()
+	now := time.Now()
+	if now.Sub(a.lastReloadTime) < a.reloadDebounce {
+		logger.Info("Skipping duplicate reload (debounced)")
+		a.reloadMutex.Unlock()
+		return
+	}
+	a.lastReloadTime = now
+	a.reloadMutex.Unlock()
+
 	logger.Info("Reloading hotkeys from updated config")
 
-	// Stop current hotkey manager
-	if a.hotkeyManager != nil {
-		a.hotkeyManager.Stop()
-		a.hotkeyManager.Close()
-	}
-
-	// Create new hotkey manager
-	newManager := input.NewFFIHotkeyManager()
-	if newManager == nil {
-		logger.Error("Failed to create new hotkey manager")
-		a.notifications.ShowError("Hotkey Reload Failed", "Failed to reload hotkeys")
+	if a.hotkeyManager == nil {
+		logger.Error("Hotkey manager not initialized")
 		return
 	}
 
-	a.hotkeyManager = newManager
+	// Clear all existing bindings (keep listener running to avoid spawning new threads)
+	logger.Info("Clearing existing hotkey bindings")
+	if err := a.hotkeyManager.ClearBindings(); err != nil {
+		logger.Error("Failed to clear bindings", "error", err)
+		a.notifications.ShowError("Hotkey Reload Failed", "Failed to clear old hotkeys")
+		return
+	}
 
 	// Re-register hotkeys with new config
+	logger.Info("Re-registering hotkeys with new config")
 	a.setupHotkeys()
 
-	// Start the new hotkey manager
-	if err := a.hotkeyManager.Start(); err != nil {
-		logger.Error("Failed to start new hotkey manager", "error", err)
-		a.notifications.ShowError("Hotkey Reload Failed", "Failed to start hotkeys: "+err.Error())
-		return
-	}
-
+	// No need to stop/start - the running listener will use the updated bindings
 	logger.Info("Hotkeys reloaded successfully",
 		"select_all", a.config.Hotkeys.SelectAll,
 		"selection", a.config.Hotkeys.Selection)

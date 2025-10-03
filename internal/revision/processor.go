@@ -258,6 +258,7 @@ func (p *Processor) reviseText(text string) (string, error) {
 
 	logger.Info("Sending text to AI provider",
 		"provider", provider.GetName(),
+		"model", provider.GetModel(),
 		"text", text,
 		"text_length", len(text),
 	)

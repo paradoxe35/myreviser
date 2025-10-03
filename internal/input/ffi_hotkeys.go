@@ -37,6 +37,7 @@ import (
 // FFIHotkeyManager wraps the Rust FFI hotkey manager
 type FFIHotkeyManager struct {
 	mu          sync.RWMutex
+	ffiMu       sync.Mutex // Separate mutex for FFI calls
 	handle      C.HotkeyManagerHandle
 	handlers    map[string]func()
 	active      bool
@@ -91,15 +92,44 @@ func (h *FFIHotkeyManager) RegisterHandler(action string, handler func()) {
 	logger.Info("FFI: Handler registered", "action", action)
 }
 
+// ClearBindings clears all registered hotkey bindings
+func (h *FFIHotkeyManager) ClearBindings() error {
+	if h.handle == nil {
+		return fmt.Errorf("hotkey manager not initialized")
+	}
+
+	// Clear Go-side handlers first
+	h.mu.Lock()
+	h.handlers = make(map[string]func())
+	h.mu.Unlock()
+
+	// Serialize FFI call
+	h.ffiMu.Lock()
+	result := C.myreviser_hotkey_clear(h.handle)
+	h.ffiMu.Unlock()
+
+	if result != 0 {
+		return fmt.Errorf("failed to clear hotkey bindings: %s", getLastError())
+	}
+
+	logger.Info("FFI: Hotkey bindings cleared")
+	return nil
+}
+
 // RegisterHotkey registers a hotkey with an action and handler
 func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()) error {
 	if h.handle == nil {
 		return fmt.Errorf("hotkey manager not initialized")
 	}
 
+	// Store handler first
 	h.mu.Lock()
 	h.handlers[action] = handler
 	h.mu.Unlock()
+
+	// Serialize FFI calls to prevent concurrent CGO operations
+	h.ffiMu.Lock()
+	defer h.ffiMu.Unlock()
 
 	cBinding := C.CString(binding)
 	cAction := C.CString(action)
@@ -137,7 +167,11 @@ func (h *FFIHotkeyManager) Start() error {
 
 	logger.Info("FFI: Starting hotkey manager")
 
+	// Serialize FFI call
+	h.ffiMu.Lock()
 	result := C.myreviser_hotkey_start(h.handle)
+	h.ffiMu.Unlock()
+
 	if result != 0 {
 		return fmt.Errorf("failed to start hotkey manager: %s", getLastError())
 	}
@@ -153,24 +187,31 @@ func (h *FFIHotkeyManager) Start() error {
 // Stop stops listening for hotkeys
 func (h *FFIHotkeyManager) Stop() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	if !h.active {
+		h.mu.Unlock()
 		return
 	}
-
 	if h.handle == nil {
+		h.mu.Unlock()
 		return
 	}
+	h.mu.Unlock()
 
 	logger.Info("FFI: Stopping hotkey manager")
 
+	// Serialize FFI call
+	h.ffiMu.Lock()
 	result := C.myreviser_hotkey_stop(h.handle)
+	h.ffiMu.Unlock()
+
 	if result != 0 {
 		logger.Error("FFI: Failed to stop hotkey manager", "error", getLastError())
 	}
 
+	h.mu.Lock()
 	h.active = false
+	h.mu.Unlock()
+
 	logger.Info("FFI: Hotkey manager stopped")
 }
 
@@ -185,9 +226,19 @@ func (h *FFIHotkeyManager) IsActive() bool {
 func (h *FFIHotkeyManager) Close() {
 	h.Stop()
 
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	if h.handle != nil {
+		logger.Info("FFI: Freeing hotkey manager resources")
+
+		// Serialize FFI call
+		h.ffiMu.Lock()
 		C.myreviser_hotkey_manager_free(h.handle)
+		h.ffiMu.Unlock()
+
 		h.handle = nil
+		h.handlers = make(map[string]func()) // Clear handlers
 	}
 
 	// Clear global reference
@@ -196,6 +247,8 @@ func (h *FFIHotkeyManager) Close() {
 		globalFFIHotkeyManager = nil
 	}
 	globalFFIMu.Unlock()
+
+	logger.Info("FFI: Hotkey manager closed")
 }
 
 // Disable and Enable are not supported in FFI version yet

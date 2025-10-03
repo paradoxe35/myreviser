@@ -35,6 +35,11 @@ impl SimpleHotkeyManager {
         }
     }
 
+    pub fn clear_bindings(&mut self) {
+        self.bindings.lock().clear();
+        tracing::info!("Cleared all hotkey bindings");
+    }
+
     pub fn register(
         &mut self,
         binding: String,
@@ -383,6 +388,20 @@ pub unsafe extern "C" fn myreviser_hotkey_manager_new() -> HotkeyManagerHandle {
 
     let manager = Box::new(SimpleHotkeyManager::new());
     Box::into_raw(manager) as HotkeyManagerHandle
+}
+
+/// Clear all registered hotkeys
+/// Returns: 0 on success, error code on failure
+#[no_mangle]
+pub unsafe extern "C" fn myreviser_hotkey_clear(handle: HotkeyManagerHandle) -> c_int {
+    if handle.is_null() {
+        set_last_error("Null hotkey manager handle provided".to_string());
+        return FFIErrorCode::NullPointer as c_int;
+    }
+
+    let manager = &mut *(handle as *mut SimpleHotkeyManager);
+    manager.clear_bindings();
+    FFIErrorCode::Success as c_int
 }
 
 /// Register a hotkey with callback

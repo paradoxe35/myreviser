@@ -87,6 +87,12 @@ void myreviser_clipboard_free(ClipboardHandle handle);
 HotkeyManagerHandle myreviser_hotkey_manager_new(void);
 
 /**
+ * Clear all registered hotkeys
+ * Returns: 0 on success, error code on failure
+ */
+int myreviser_hotkey_clear(HotkeyManagerHandle handle);
+
+/**
  * Register a hotkey with callback
  * binding: Hotkey string like "ctrl+alt+space"
  * action: Action identifier (passed to callback)

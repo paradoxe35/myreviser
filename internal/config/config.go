@@ -220,12 +220,8 @@ func Update(fn func(*Config)) error {
 	}
 
 	fn(currentConfig)
-	err := currentConfig.Save()
-	if err == nil {
-		// Notify listeners about config change
-		notifyListeners(currentConfig)
-	}
-	return err
+	// Save() already notifies listeners, so we don't need to call it again
+	return currentConfig.Save()
 }
 
 // RegisterListener registers a callback to be called when config changes
