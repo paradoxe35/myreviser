@@ -1505,7 +1505,7 @@ fyne package -os linux -icon assets/icon.png
 
 ### Improvements Implemented:
 
-- [x] Move single instance lock file to `~/.myscript/` directory (not `.myreviser`)
+- [x] Move single instance lock file to `~/.myreviser/` directory (not `.myreviser`)
 - [x] Fix window max width issue - prevent infinite expansion when displaying errors
 - [x] Add proper spacing/padding between UI elements for professional look
 - [x] Implement "Start Minimized" setting respect in UI
@@ -1528,7 +1528,7 @@ fyne package -os linux -icon assets/icon.png
 #### 1. Lock File Location Fix
 
 - Current: Creates lock in system temp directory
-- Required: Create lock in `$HOME/.myscript/myscript.lock`
+- Required: Create lock in `$HOME/.myreviser/myreviser.lock`
 - Update single instance manager initialization
 
 #### 2. Window Size Constraints

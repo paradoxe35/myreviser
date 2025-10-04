@@ -51,6 +51,5 @@ rust/
 
 # Config and lock files (local testing)
 .myreviser/
-.myscript/
 *.lock
 tmp/

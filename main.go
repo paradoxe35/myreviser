@@ -7,12 +7,12 @@ package main
 import (
 	"log"
 	"os"
-	"path/filepath"
 
 	"fyne.io/fyne/v2/app"
 	singleinstance "github.com/allan-simon/go-singleinstance"
 	"github.com/paradoxe35/myreviser/internal/config"
 	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/utils"
 	"github.com/paradoxe35/myreviser/ui"
 )
 
@@ -27,21 +27,11 @@ func main() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
+	// Ensure ~/.myreviser created
+	utils.EnsureAppHomeDir()
+
 	// Check for single instance
-	// Create lock file in ~/.myscript/ directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		logger.Error("Failed to get user home directory", "error", err)
-		os.Exit(1)
-	}
-
-	lockDir := filepath.Join(homeDir, ".myscript")
-	if err := os.MkdirAll(lockDir, 0755); err != nil {
-		logger.Error("Failed to create lock directory", "error", err)
-		os.Exit(1)
-	}
-
-	lockPath := filepath.Join(lockDir, "myscript.lock")
+	lockPath := utils.AppHomeDir("myreviser.lock")
 	lockFile, err := singleinstance.CreateLockFile(lockPath)
 	if err != nil {
 		logger.Error("Another instance is already running", "error", err)
@@ -57,7 +47,7 @@ func main() {
 	}
 
 	// Create Fyne application
-	myApp := app.NewWithID("me.pngwasi.myreviser")
+	myApp := app.NewWithID(config.APP_ID)
 	myApp.SetIcon(resourceIconPng)
 	myApp.Settings().SetTheme(&ui.MyReviserTheme{})
 

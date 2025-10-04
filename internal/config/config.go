@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+
+	"github.com/paradoxe35/myreviser/internal/utils"
 )
 
 type Config struct {
@@ -58,10 +60,11 @@ var (
 	listenerMutex sync.RWMutex
 )
 
+const APP_ID = "me.pngwasi.myreviser"
+
 // ConfigPath returns the path to the configuration file
 func ConfigPath() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".myreviser", "config.json")
+	return utils.AppHomeDir("config.json")
 }
 
 // Default returns the default configuration

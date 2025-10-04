@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/paradoxe35/myreviser/internal/utils"
 )
 
 var (
@@ -15,12 +17,7 @@ var (
 
 // Init initializes the logger with daily log rotation
 func Init() error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	logDir := filepath.Join(homeDir, ".myreviser", "logs")
+	logDir := utils.AppHomeDir("logs")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return fmt.Errorf("failed to create log directory: %w", err)
 	}
@@ -92,16 +89,15 @@ func GetCurrentLogFile() string {
 	if currentLogFile != "" {
 		return currentLogFile
 	}
+
 	// Fallback: construct path with today's date
-	homeDir, _ := os.UserHomeDir()
 	today := time.Now().Format("2006-01-02")
-	return filepath.Join(homeDir, ".myreviser", "logs", fmt.Sprintf("myreviser-%s.log", today))
+	return utils.AppHomeDir("logs", fmt.Sprintf("myreviser-%s.log", today))
 }
 
 // GetLogDirectory returns the path to the logs directory
 func GetLogDirectory() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".myreviser", "logs")
+	return utils.AppHomeDir("logs")
 }
 
 // cleanupOldLogs removes log files older than the specified number of days
