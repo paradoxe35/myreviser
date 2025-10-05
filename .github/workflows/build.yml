@@ -106,9 +106,15 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag (remove 'v' prefix)
-          VERSION="${GITHUB_REF_NAME#v}"
+          # Extract version from tag or use commit SHA for manual dispatch
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+
+          echo "Building version: ${VERSION} (build: ${BUILD_NUMBER})"
 
           # Use fyne package with version info (creates MyReviser.tar.xz for Linux)
           fyne package --icon assets/icon.png --name MyReviser --release \
@@ -365,9 +371,15 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag (remove 'v' prefix)
-          $VERSION = "${{ github.ref_name }}" -replace '^v',''
+          # Extract version from tag or use commit SHA for manual dispatch
+          if ("${{ github.ref }}" -like "refs/tags/*") {
+            $VERSION = "${{ github.ref_name }}" -replace '^v',''
+          } else {
+            $VERSION = "dev-${{ github.sha }}".Substring(0, 11)
+          }
           $BUILD_NUMBER = "${{ github.run_number }}"
+
+          Write-Host "Building version: $VERSION (build: $BUILD_NUMBER)"
 
           # Use fyne package with version info
           fyne package --icon assets/icon.ico --name MyReviser --release `
@@ -643,9 +655,15 @@ jobs:
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag (remove 'v' prefix)
-          VERSION="${GITHUB_REF_NAME#v}"
+          # Extract version from tag or use commit SHA for manual dispatch
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+
+          echo "Building version: ${VERSION} (build: ${BUILD_NUMBER})"
 
           # Use fyne package with version info
           fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release \
