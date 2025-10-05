@@ -178,7 +178,7 @@ func (p *GeminiProvider) GetModel() string {
 	return p.Model
 }
 
-// GetModel returns the temperature being used
+// GetTemperature returns the temperature being used
 func (p *GeminiProvider) GetTemperature() float64 {
 	return p.Temperature
 }

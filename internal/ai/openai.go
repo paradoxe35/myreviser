@@ -147,7 +147,7 @@ func (p *OpenAIProvider) GetModel() string {
 	return p.Model
 }
 
-// GetModel returns the temperature being used
+// GetTemperature returns the temperature being used
 func (p *OpenAIProvider) GetTemperature() float64 {
 	return p.Temperature
 }
