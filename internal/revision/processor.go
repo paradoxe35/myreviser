@@ -57,15 +57,26 @@ func NewProcessor(cfg *config.Config) (*Processor, error) {
 
 // initializeProviders initializes the AI providers
 func (p *Processor) initializeProviders() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	cfg := p.config
 
 	// Get current provider name
 	currentProvider := cfg.GetCurrentProvider()
+	if currentProvider == "" {
+		return fmt.Errorf("no provider configured")
+	}
 
 	// Get decrypted API key for current provider
 	apiKey, err := cfg.GetCurrentAPIKey()
 	if err != nil {
 		return fmt.Errorf("failed to get API key: %w", err)
+	}
+
+	// Validate API key is not empty
+	if strings.TrimSpace(apiKey) == "" {
+		return fmt.Errorf("API key is empty for provider: %s", currentProvider)
 	}
 
 	// Get provider settings
@@ -147,7 +158,14 @@ func (p *Processor) ProcessSelectAll() error {
 	// Get text from clipboard
 	text, err := p.clipboardManager.GetText()
 	if err != nil {
+		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to get clipboard text: %w", err)
+	}
+
+	// Validate text is not empty
+	if strings.TrimSpace(text) == "" {
+		p.clipboardManager.Restore()
+		return fmt.Errorf("no text to revise (clipboard is empty or contains only whitespace)")
 	}
 
 	// Process the text
@@ -206,16 +224,20 @@ func (p *Processor) ProcessSelection() error {
 	// Capture selected text (saves clipboard, copies, returns text)
 	text, err := p.clipboardManager.CaptureSelectedText()
 	if err != nil {
+		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to capture selected text: %w", err)
 	}
 
+	// Validate text is not empty or whitespace-only
 	if strings.TrimSpace(text) == "" {
-		return fmt.Errorf("no text selected")
+		p.clipboardManager.Restore()
+		return fmt.Errorf("no text selected or selection is empty")
 	}
 
 	// Process the text
 	revisedText, err := p.reviseText(text)
 	if err != nil {
+		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
@@ -239,10 +261,21 @@ func (p *Processor) reviseText(text string) (string, error) {
 	cfg := p.config
 	p.mu.Unlock()
 
-	// Check character limit
+	// Validate text is not empty or whitespace-only
+	trimmedText := strings.TrimSpace(text)
+	if trimmedText == "" {
+		return "", fmt.Errorf("text is empty or contains only whitespace")
+	}
+
+	// Check character limit (use original text length for limit check)
 	if len(text) > cfg.Revision.CharacterLimit {
 		return "", fmt.Errorf("text exceeds character limit (%d > %d)",
 			len(text), cfg.Revision.CharacterLimit)
+	}
+
+	// Minimum text length check (at least 1 character after trimming)
+	if len(trimmedText) < 1 {
+		return "", fmt.Errorf("text too short to revise")
 	}
 
 	// Get current provider
@@ -268,6 +301,12 @@ func (p *Processor) reviseText(text string) (string, error) {
 	revised, err := provider.ReviseText(ctx, text, p.config.Revision.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("AI revision failed: %w", err)
+	}
+
+	// Validate revised text is not empty
+	revisedTrimmed := strings.TrimSpace(revised)
+	if revisedTrimmed == "" {
+		return "", fmt.Errorf("AI provider returned empty response")
 	}
 
 	logger.Info("Text revised successfully",
