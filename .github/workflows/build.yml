@@ -888,13 +888,6 @@ jobs:
             **Linux**: X11, OpenGL (libgl1), libX11, libXtst
             **macOS**: macOS 10.13+, accessibility permissions required
             **Windows**: Windows 10+
-
-            ## Technical Details
-
-            Built with Go 1.24 + Rust FFI (rdev, arboard, enigo) for optimal performance.
-
-            See [CHANGELOG.md](CHANGELOG.md) for full release notes.
-            Visit [GitHub](https://github.com/paradoxe35/myreviser) for documentation.
           draft: false
           prerelease: false
           generate_release_notes: true

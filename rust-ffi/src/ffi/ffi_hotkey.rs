@@ -302,6 +302,13 @@ fn key_to_string(key: &Key) -> String {
         Key::F10 => "f10".to_string(),
         Key::F11 => "f11".to_string(),
         Key::F12 => "f12".to_string(),
+        Key::Tab => "tab".to_string(),
+        Key::Backspace => "backspace".to_string(),
+        Key::Delete => "delete".to_string(),
+        Key::UpArrow => "up".to_string(),
+        Key::DownArrow => "down".to_string(),
+        Key::LeftArrow => "left".to_string(),
+        Key::RightArrow => "right".to_string(),
         _ => "unknown".to_string(),
     }
 }
