@@ -13,12 +13,8 @@ import (
 	"github.com/paradoxe35/myreviser/internal/config"
 	"github.com/paradoxe35/myreviser/internal/logger"
 	"github.com/paradoxe35/myreviser/internal/utils"
+	"github.com/paradoxe35/myreviser/internal/version"
 	"github.com/paradoxe35/myreviser/ui"
-)
-
-var (
-	Version   = "dev"
-	BuildTime = "unknown"
 )
 
 func main() {
@@ -51,7 +47,9 @@ func main() {
 	myApp.SetIcon(resourceIconPng)
 	myApp.Settings().SetTheme(&ui.MyReviserTheme{})
 
-	logger.Info("MyReviser starting", "version", Version, "build_time", BuildTime)
+	logger.Info("MyReviser starting",
+		"version", version.GetVersion(myApp),
+		"build", version.GetBuildNumber(myApp))
 
 	// Create and start the application
 	application, err := NewApplication(myApp, cfg)

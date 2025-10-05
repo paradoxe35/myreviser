@@ -18,8 +18,7 @@
 .PHONY: clean-rust clean-go ci-setup ci-build ci-test ci-package verify-static
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S')
-LDFLAGS := -s -w -X 'main.Version=$(VERSION)' -X 'main.BuildTime=$(BUILD_TIME)'
+BUILD_NUMBER := 1
 
 # Detect current OS and architecture
 UNAME_S := $(shell uname -s)
@@ -254,9 +253,36 @@ build-go: bundle-assets ensure-fyne
 	}
 	CGO_ENABLED=1 \
 	CC=$(CC) \
-	fyne build -release -o $(BIN_DIR)/myreviser$(BIN_EXT)
+	fyne package --release \
+		--app-version "$(VERSION)" \
+		--app-build "$(BUILD_NUMBER)"
+	@# Extract the built binary from the package
+ifeq ($(CURRENT_OS),linux)
+	@if [ -f MyReviser.tar.xz ]; then \
+		tar -xf MyReviser.tar.xz; \
+		BINARY=$$(find usr/local/bin -type f -executable | head -n 1); \
+		if [ -n "$$BINARY" ]; then \
+			mkdir -p $(BIN_DIR); \
+			cp "$$BINARY" $(BIN_DIR)/myreviser$(BIN_EXT); \
+			rm -rf usr MyReviser.tar.xz; \
+		fi; \
+	fi
+endif
+ifeq ($(CURRENT_OS),darwin)
+	@if [ -d MyReviser.app ]; then \
+		mkdir -p $(BIN_DIR); \
+		mv MyReviser.app $(BIN_DIR)/MyReviser.app; \
+	fi
+endif
+ifeq ($(CURRENT_OS),windows)
+	@if [ -f MyReviser.exe ]; then \
+		mkdir -p $(BIN_DIR); \
+		mv MyReviser.exe $(BIN_DIR)/myreviser$(BIN_EXT); \
+	fi
+endif
 	@echo "Go application built successfully!"
 	@echo "Binary: $(BIN_DIR)/myreviser$(BIN_EXT)"
+	@echo "Version: $(VERSION) (Build: $(BUILD_NUMBER))"
 
 # Build everything (Rust + Go)
 build: build-rust build-go
@@ -304,8 +330,19 @@ package-all: clean
 		CC=musl-gcc \
 		GOOS=linux \
 		GOARCH=amd64 \
-		fyne build -release \
-			-o $(BIN_DIR)/myreviser-linux-amd64
+		fyne package --release \
+			--app-version "$(VERSION)" \
+			--app-build "$(BUILD_NUMBER)"
+	@# Extract binary from package
+	@if [ -f MyReviser.tar.xz ]; then \
+		tar -xf MyReviser.tar.xz; \
+		BINARY=$$(find usr/local/bin -type f -executable | head -n 1); \
+		if [ -n "$$BINARY" ]; then \
+			mkdir -p $(BIN_DIR); \
+			cp "$$BINARY" $(BIN_DIR)/myreviser-linux-amd64; \
+			rm -rf usr MyReviser.tar.xz; \
+		fi; \
+	fi
 
 	@echo ""
 	@echo "=== Building for macOS (Intel) ==="
@@ -313,7 +350,9 @@ package-all: clean
 	CGO_ENABLED=1 \
 		GOOS=darwin \
 		GOARCH=amd64 \
-		fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
+		fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release \
+			--app-version "$(VERSION)" \
+			--app-build "$(BUILD_NUMBER)"
 	mv MyReviser.app $(BIN_DIR)/MyReviser-darwin-amd64.app
 
 	@echo ""
@@ -322,7 +361,9 @@ package-all: clean
 	CGO_ENABLED=1 \
 		GOOS=darwin \
 		GOARCH=arm64 \
-		fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
+		fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release \
+			--app-version "$(VERSION)" \
+			--app-build "$(BUILD_NUMBER)"
 	mv MyReviser.app $(BIN_DIR)/MyReviser-darwin-arm64.app
 
 	@echo ""
@@ -332,8 +373,14 @@ package-all: clean
 		CC=x86_64-w64-mingw32-gcc \
 		GOOS=windows \
 		GOARCH=amd64 \
-		fyne build -release \
-			-o $(BIN_DIR)/myreviser-windows-amd64.exe
+		fyne package --release \
+			--app-version "$(VERSION)" \
+			--app-build "$(BUILD_NUMBER)"
+	@# Move the exe to bin directory
+	@if [ -f MyReviser.exe ]; then \
+		mkdir -p $(BIN_DIR); \
+		mv MyReviser.exe $(BIN_DIR)/myreviser-windows-amd64.exe; \
+	fi
 
 	@echo ""
 	@echo "✓ All platforms built successfully!"

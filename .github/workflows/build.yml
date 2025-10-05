@@ -106,8 +106,14 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          # fyne package creates MyReviser.tar.xz for Linux
-          fyne package --icon assets/icon.png --name MyReviser --release
+          # Extract version from tag (remove 'v' prefix)
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+
+          # Use fyne package with version info (creates MyReviser.tar.xz for Linux)
+          fyne package --icon assets/icon.png --name MyReviser --release \
+            --app-version "${VERSION}" \
+            --app-build "${BUILD_NUMBER}"
 
           # Extract MyReviser.tar.xz
           tar -xf MyReviser.tar.xz
@@ -359,7 +365,15 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne package --icon assets/icon.ico --name MyReviser --release
+          # Extract version from tag (remove 'v' prefix)
+          $VERSION = "${{ github.ref_name }}" -replace '^v',''
+          $BUILD_NUMBER = "${{ github.run_number }}"
+
+          # Use fyne package with version info
+          fyne package --icon assets/icon.ico --name MyReviser --release `
+            --app-version "$VERSION" `
+            --app-build "$BUILD_NUMBER"
+
           # fyne package creates MyReviser.exe, rename it
           if (Test-Path "MyReviser.exe") {
             Move-Item MyReviser.exe myreviser-windows-${{ matrix.arch }}.exe
@@ -629,7 +643,14 @@ jobs:
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release
+          # Extract version from tag (remove 'v' prefix)
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+
+          # Use fyne package with version info
+          fyne package --icon assets/icon.png --name MyReviser --app-id me.pngwasi.myreviser --release \
+            --app-version "${VERSION}" \
+            --app-build "${BUILD_NUMBER}"
 
       - name: Verify .app bundle created
         run: |
