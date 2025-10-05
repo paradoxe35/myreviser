@@ -557,17 +557,14 @@ func (w *MainWindow) createSystemSection() fyne.CanvasObject {
 	startOnLoginCheck.Bind(w.startOnLoginBinding)
 
 	// Version display (only show for production builds)
-	var versionContainer *fyne.Container
+	var versionContainer fyne.CanvasObject
 	if version.IsProduction(w.app) {
 		versionLabel := widget.NewLabel(fmt.Sprintf("Version: %s", version.GetVersion(w.app)))
 		versionLabel.TextStyle.Italic = true
 		// Use a subtle gray color for the version
 		versionLabel.Importance = widget.LowImportance
 
-		versionContainer = container.NewVBox(
-			widget.NewSeparator(),
-			container.NewPadded(versionLabel),
-		)
+		versionContainer = container.NewPadded(versionLabel)
 	}
 
 	formItems := []fyne.CanvasObject{
