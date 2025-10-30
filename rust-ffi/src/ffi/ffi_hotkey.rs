@@ -383,12 +383,6 @@ fn matches_modifier_only_binding(
     ctrl_just_pressed || alt_just_pressed || shift_just_pressed || meta_just_pressed
 }
 
-// ============================================================================
-// FFI Functions
-// ============================================================================
-
-/// Create a new hotkey manager
-/// Returns: Opaque handle to hotkey manager or NULL on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_hotkey_manager_new() -> HotkeyManagerHandle {
     init_logging();
@@ -397,8 +391,6 @@ pub unsafe extern "C" fn myreviser_hotkey_manager_new() -> HotkeyManagerHandle {
     Box::into_raw(manager) as HotkeyManagerHandle
 }
 
-/// Clear all registered hotkeys
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_hotkey_clear(handle: HotkeyManagerHandle) -> c_int {
     if handle.is_null() {
@@ -411,11 +403,6 @@ pub unsafe extern "C" fn myreviser_hotkey_clear(handle: HotkeyManagerHandle) -> 
     FFIErrorCode::Success as c_int
 }
 
-/// Register a hotkey with callback
-/// binding: Hotkey string like "ctrl+alt+space"
-/// action: Action identifier (passed to callback)
-/// callback: Function to call when hotkey is pressed
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_hotkey_register(
     handle: HotkeyManagerHandle,
@@ -460,8 +447,6 @@ pub unsafe extern "C" fn myreviser_hotkey_register(
     }
 }
 
-/// Start listening for hotkeys
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_hotkey_start(handle: HotkeyManagerHandle) -> c_int {
     if handle.is_null() {
@@ -480,8 +465,6 @@ pub unsafe extern "C" fn myreviser_hotkey_start(handle: HotkeyManagerHandle) -> 
     }
 }
 
-/// Stop listening for hotkeys
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_hotkey_stop(handle: HotkeyManagerHandle) -> c_int {
     if handle.is_null() {
@@ -500,7 +483,6 @@ pub unsafe extern "C" fn myreviser_hotkey_stop(handle: HotkeyManagerHandle) -> c
     }
 }
 
-/// Free hotkey manager resources
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_hotkey_manager_free(handle: HotkeyManagerHandle) {
     if !handle.is_null() {

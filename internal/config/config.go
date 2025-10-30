@@ -238,24 +238,21 @@ func Update(fn func(*Config)) error {
 	}
 
 	fn(currentConfig)
-	// Save() already notifies listeners, so we don't need to call it again
 	return currentConfig.Save()
 }
 
-// RegisterListener registers a callback to be called when config changes
 func RegisterListener(listener func(*Config)) {
 	listenerMutex.Lock()
 	defer listenerMutex.Unlock()
 	listeners = append(listeners, listener)
 }
 
-// notifyListeners notifies all registered listeners about config changes
 func notifyListeners(cfg *Config) {
 	listenerMutex.RLock()
 	defer listenerMutex.RUnlock()
 
 	for _, listener := range listeners {
-		go listener(cfg) // Run listeners in goroutines to avoid blocking
+		go listener(cfg)
 	}
 }
 

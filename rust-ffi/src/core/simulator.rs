@@ -9,21 +9,18 @@ pub struct KeySimulator {
     enigo: Enigo,
 }
 
-// macOS-specific: Use CGEvent API for better compatibility with GUI apps
 #[cfg(target_os = "macos")]
 mod macos_native {
     use super::*;
     use std::ffi::c_void;
     use std::ptr;
 
-    // Core Graphics key codes
     const KCG_KEY_A: i64 = 0;
     const KCG_KEY_C: i64 = 8;
     const KCG_KEY_V: i64 = 9;
-    const KCG_FLAGMASK_COMMAND: u64 = 1 << 20; // kCGEventFlagMaskCommand
+    const KCG_FLAGMASK_COMMAND: u64 = 1 << 20;
 
     extern "C" {
-        // CGEvent functions for keyboard simulation
         fn CGEventCreateKeyboardEvent(
             source: *mut c_void,
             virtual_key: u16,
@@ -37,10 +34,7 @@ mod macos_native {
 
     const KCG_HID_EVENT_TAP: u32 = 0;
 
-    /// Send a key combination using Core Graphics Event API
-    /// This is more reliable than enigo when Fyne GUI is active
     pub unsafe fn send_key_combo(key_code: u16, with_command: bool) -> Result<()> {
-        // Key down
         let event_down = CGEventCreateKeyboardEvent(ptr::null_mut(), key_code, true);
         if event_down.is_null() {
             return Err(anyhow::anyhow!("Failed to create key down event"));
@@ -53,10 +47,8 @@ mod macos_native {
         CGEventPost(KCG_HID_EVENT_TAP, event_down);
         CFRelease(event_down);
 
-        // Small delay
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        // Key up
         let event_up = CGEventCreateKeyboardEvent(ptr::null_mut(), key_code, false);
         if event_up.is_null() {
             return Err(anyhow::anyhow!("Failed to create key up event"));
@@ -99,7 +91,6 @@ impl KeySimulator {
 
         #[cfg(target_os = "macos")]
         {
-            // Use native CGEvent API for better Fyne compatibility
             macos_native::simulate_select_all()
         }
 
@@ -117,7 +108,6 @@ impl KeySimulator {
 
         #[cfg(target_os = "macos")]
         {
-            // Use native CGEvent API for better Fyne compatibility
             macos_native::simulate_copy()
         }
 
@@ -135,7 +125,6 @@ impl KeySimulator {
 
         #[cfg(target_os = "macos")]
         {
-            // Use native CGEvent API for better Fyne compatibility
             macos_native::simulate_paste()
         }
 

@@ -19,8 +19,6 @@ package input
 #include <stdlib.h>
 #include "bindings.h"
 
-// Callback wrapper - Go can't pass Go functions to C directly
-// This is called from Rust
 extern void hotkeyCallbackGateway(char* action);
 */
 import "C"
@@ -63,7 +61,6 @@ func NewFFIHotkeyManager() *FFIHotkeyManager {
 		lastTrigger: make(map[string]time.Time),
 	}
 
-	// Set as global for callback routing
 	globalFFIMu.Lock()
 	globalFFIHotkeyManager = manager
 	globalFFIMu.Unlock()
@@ -71,7 +68,6 @@ func NewFFIHotkeyManager() *FFIHotkeyManager {
 	return manager
 }
 
-// SetBindings sets the hotkey bindings
 func (h *FFIHotkeyManager) SetBindings(selectAll, selection string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -79,11 +75,8 @@ func (h *FFIHotkeyManager) SetBindings(selectAll, selection string) {
 	logger.Info("FFI: Setting hotkey bindings",
 		"select_all", selectAll,
 		"selection", selection)
-
-	// Note: We'll register these when handlers are set
 }
 
-// RegisterHandler registers a handler for a specific action
 func (h *FFIHotkeyManager) RegisterHandler(action string, handler func()) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -92,18 +85,15 @@ func (h *FFIHotkeyManager) RegisterHandler(action string, handler func()) {
 	logger.Info("FFI: Handler registered", "action", action)
 }
 
-// ClearBindings clears all registered hotkey bindings
 func (h *FFIHotkeyManager) ClearBindings() error {
 	if h.handle == nil {
 		return fmt.Errorf("hotkey manager not initialized")
 	}
 
-	// Clear Go-side handlers first
 	h.mu.Lock()
 	h.handlers = make(map[string]func())
 	h.mu.Unlock()
 
-	// Serialize FFI call
 	h.ffiMu.Lock()
 	result := C.myreviser_hotkey_clear(h.handle)
 	h.ffiMu.Unlock()
@@ -116,18 +106,15 @@ func (h *FFIHotkeyManager) ClearBindings() error {
 	return nil
 }
 
-// RegisterHotkey registers a hotkey with an action and handler
 func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()) error {
 	if h.handle == nil {
 		return fmt.Errorf("hotkey manager not initialized")
 	}
 
-	// Store handler first
 	h.mu.Lock()
 	h.handlers[action] = handler
 	h.mu.Unlock()
 
-	// Serialize FFI calls to prevent concurrent CGO operations
 	h.ffiMu.Lock()
 	defer h.ffiMu.Unlock()
 
@@ -136,7 +123,6 @@ func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()
 	defer C.free(unsafe.Pointer(cBinding))
 	defer C.free(unsafe.Pointer(cAction))
 
-	// Register with Rust FFI
 	result := C.myreviser_hotkey_register(
 		h.handle,
 		cBinding,
@@ -167,7 +153,6 @@ func (h *FFIHotkeyManager) Start() error {
 
 	logger.Info("FFI: Starting hotkey manager")
 
-	// Serialize FFI call
 	h.ffiMu.Lock()
 	result := C.myreviser_hotkey_start(h.handle)
 	h.ffiMu.Unlock()
@@ -199,7 +184,6 @@ func (h *FFIHotkeyManager) Stop() {
 
 	logger.Info("FFI: Stopping hotkey manager")
 
-	// Serialize FFI call
 	h.ffiMu.Lock()
 	result := C.myreviser_hotkey_stop(h.handle)
 	h.ffiMu.Unlock()
@@ -232,16 +216,14 @@ func (h *FFIHotkeyManager) Close() {
 	if h.handle != nil {
 		logger.Info("FFI: Freeing hotkey manager resources")
 
-		// Serialize FFI call
 		h.ffiMu.Lock()
 		C.myreviser_hotkey_manager_free(h.handle)
 		h.ffiMu.Unlock()
 
 		h.handle = nil
-		h.handlers = make(map[string]func()) // Clear handlers
+		h.handlers = make(map[string]func())
 	}
 
-	// Clear global reference
 	globalFFIMu.Lock()
 	if globalFFIHotkeyManager == h {
 		globalFFIHotkeyManager = nil
@@ -251,8 +233,6 @@ func (h *FFIHotkeyManager) Close() {
 	logger.Info("FFI: Hotkey manager closed")
 }
 
-// Disable and Enable are not supported in FFI version yet
-// They would require additional Rust FFI functions
 func (h *FFIHotkeyManager) Disable() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -270,15 +250,8 @@ func (h *FFIHotkeyManager) Enable() {
 // hotkeyCallbackGateway is called from Rust when a hotkey is triggered
 // This function must be exported for C
 //
-// IMPORTANT: The action string is allocated by Rust and must be freed by us
-//
 //export hotkeyCallbackGateway
 func hotkeyCallbackGateway(action *C.char) {
-	// CRITICAL: This function is called from a Rust thread (rdev listener thread)
-	// We need to handle this carefully to avoid crashes
-
-	// First, safely copy the string and free the Rust allocation
-	// Do this BEFORE any other operations to minimize FFI calls
 	var actionStr string
 	if action != nil {
 		actionStr = C.GoString(action)
@@ -287,7 +260,6 @@ func hotkeyCallbackGateway(action *C.char) {
 		return
 	}
 
-	// Get manager reference safely
 	globalFFIMu.Lock()
 	manager := globalFFIHotkeyManager
 	globalFFIMu.Unlock()
@@ -296,16 +268,15 @@ func hotkeyCallbackGateway(action *C.char) {
 		return
 	}
 
-	// Check disabled state and debounce window atomically
 	manager.mu.Lock()
 	if manager.disabled {
 		manager.mu.Unlock()
-		return // Silently ignore when disabled (during capture)
+		return
 	}
 	if t, ok := manager.lastTrigger[actionStr]; ok {
 		if time.Since(t) < 500*time.Millisecond {
 			manager.mu.Unlock()
-			return // Silently ignore debounced events
+			return
 		}
 	}
 	manager.lastTrigger[actionStr] = time.Now()
@@ -313,12 +284,9 @@ func hotkeyCallbackGateway(action *C.char) {
 	manager.mu.Unlock()
 
 	if !exists || handler == nil {
-		return // Silently ignore unknown actions
+		return
 	}
 
-	// Execute handler in a goroutine to avoid blocking Rust thread
-	// CRITICAL: Wrap in recover to catch any panics and prevent app crash
-	// This is essential because we're being called from a Rust thread
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {

@@ -110,14 +110,11 @@ func (c *FFIClipboardManager) Close() {
 }
 
 // CaptureSelectedText captures the currently selected text
-// Note: Saves clipboard but does NOT restore - caller must restore after paste
 func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
-	// Save current clipboard for later restore
 	if err := c.SaveCurrent(); err != nil {
 		return "", fmt.Errorf("failed to save clipboard: %w", err)
 	}
 
-	// Simulate Ctrl+C to copy selected text
 	sim, err := NewFFIKeySimulator()
 	if err != nil {
 		return "", fmt.Errorf("failed to create simulator: %w", err)
@@ -128,30 +125,22 @@ func (c *FFIClipboardManager) CaptureSelectedText() (string, error) {
 		return "", fmt.Errorf("failed to simulate copy: %w", err)
 	}
 
-	// Wait for clipboard to update after simulated Ctrl+C
-	// This prevents race condition where we read before the OS updates clipboard
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 
-	// Get the captured text (now in clipboard)
 	text, err := c.GetText()
 	if err != nil {
 		return "", fmt.Errorf("failed to get clipboard text: %w", err)
 	}
 
-	// Return the captured text
-	// Original clipboard is saved and will be restored by caller after paste
 	return text, nil
 }
 
 // ReplaceSelectedText replaces the selected text with new text
-// Note: Does NOT save/restore clipboard - caller is responsible for that
 func (c *FFIClipboardManager) ReplaceSelectedText(newText string) error {
-	// Set new text to clipboard
 	if err := c.SetText(newText); err != nil {
 		return fmt.Errorf("failed to set clipboard text: %w", err)
 	}
 
-	// Simulate Ctrl+V to paste
 	sim, err := NewFFIKeySimulator()
 	if err != nil {
 		return fmt.Errorf("failed to create simulator: %w", err)
@@ -162,9 +151,7 @@ func (c *FFIClipboardManager) ReplaceSelectedText(newText string) error {
 		return fmt.Errorf("failed to simulate paste: %w", err)
 	}
 
-	// Wait for paste operation to complete
-	// Increased delay for more reliable paste completion
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	return nil
 }

@@ -82,9 +82,8 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Set platform-specific show/hide callbacks (for macOS Dock behavior)
 	mainWindow.SetShowHideCallbacks(showInDock, hideFromDock)
 
-	// Setup system tray if available
 	if desk, ok := app.(desktop.App); ok {
-		desk.SetSystemTrayIcon(resourceIconPng)
+		desk.SetSystemTrayIcon(resourceIcon32x32Png)
 		ui.SetupSystemTray(desk, mainWindow, func() error {
 			application.Stop()
 			return nil

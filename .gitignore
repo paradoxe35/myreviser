@@ -51,6 +51,7 @@ rust/
 
 # Config and lock files (local testing)
 .myreviser/
+tmp-pkg/
 *.lock
 tmp/
 /target

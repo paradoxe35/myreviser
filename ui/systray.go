@@ -6,10 +6,8 @@ import (
 	"github.com/paradoxe35/myreviser/internal/logger"
 )
 
-// SetupSystemTray sets up the system tray icon and menu
 func SetupSystemTray(desk desktop.App, mainWindow *MainWindow, onQuit func() error) {
-	// Set system tray menu
-	menu := fyne.NewMenu("MyReviser",
+	menu := fyne.NewMenu("MyReviser - AI Text Revision Tool",
 		fyne.NewMenuItem("Show", func() {
 			mainWindow.ShowWindow()
 		}),

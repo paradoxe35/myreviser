@@ -3,8 +3,6 @@ use std::os::raw::{c_char, c_int};
 use super::ffi_types::*;
 use crate::core::ClipboardManager;
 
-/// Create a new clipboard manager
-/// Returns: Opaque handle to clipboard manager or NULL on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_clipboard_new() -> ClipboardHandle {
     init_logging();
@@ -18,8 +16,6 @@ pub unsafe extern "C" fn myreviser_clipboard_new() -> ClipboardHandle {
     }
 }
 
-/// Get text from clipboard
-/// Returns: C string (must be freed with myreviser_free_string) or NULL on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_clipboard_get_text(handle: ClipboardHandle) -> *mut c_char {
     if handle.is_null() {
@@ -29,7 +25,6 @@ pub unsafe extern "C" fn myreviser_clipboard_get_text(handle: ClipboardHandle) -
 
     let clipboard = &*(handle as *mut ClipboardManager);
 
-    // Create a minimal runtime for the async operation
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -50,8 +45,6 @@ pub unsafe extern "C" fn myreviser_clipboard_get_text(handle: ClipboardHandle) -
     }
 }
 
-/// Set text to clipboard
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_clipboard_set_text(
     handle: ClipboardHandle,
@@ -97,8 +90,6 @@ pub unsafe extern "C" fn myreviser_clipboard_set_text(
     }
 }
 
-/// Save current clipboard content
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_clipboard_save(handle: ClipboardHandle) -> c_int {
     if handle.is_null() {
@@ -127,8 +118,6 @@ pub unsafe extern "C" fn myreviser_clipboard_save(handle: ClipboardHandle) -> c_
     }
 }
 
-/// Restore previously saved clipboard content
-/// Returns: 0 on success, error code on failure
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_clipboard_restore(handle: ClipboardHandle) -> c_int {
     if handle.is_null() {
@@ -157,7 +146,6 @@ pub unsafe extern "C" fn myreviser_clipboard_restore(handle: ClipboardHandle) ->
     }
 }
 
-/// Free clipboard manager resources
 #[no_mangle]
 pub unsafe extern "C" fn myreviser_clipboard_free(handle: ClipboardHandle) {
     if !handle.is_null() {
