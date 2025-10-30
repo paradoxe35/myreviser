@@ -27,11 +27,19 @@ UNAME_M := $(shell uname -m)
 ifeq ($(UNAME_S),Linux)
     CURRENT_OS := linux
     CURRENT_ARCH := amd64
-    RUST_TARGET := x86_64-unknown-linux-musl
+    # Use gnu target for development (faster, no cross-compile issues)
+    # Use musl target for release builds (static linking)
+    ifdef STATIC
+        RUST_TARGET := x86_64-unknown-linux-musl
+        CC := musl-gcc
+        EXTRA_LDFLAGS := -linkmode external -extldflags '-static'
+    else
+        RUST_TARGET := x86_64-unknown-linux-gnu
+        CC := gcc
+        EXTRA_LDFLAGS :=
+    endif
     LIB_EXT := a
     BIN_EXT :=
-    CC := musl-gcc
-    EXTRA_LDFLAGS := -linkmode external -extldflags '-static'
 endif
 
 ifeq ($(UNAME_S),Darwin)
