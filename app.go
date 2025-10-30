@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/systray"
 	"github.com/paradoxe35/myreviser/internal/config"
 	"github.com/paradoxe35/myreviser/internal/input"
 	"github.com/paradoxe35/myreviser/internal/logger"
@@ -89,6 +90,11 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 			return nil
 		})
 	}
+
+	// Set tray tooltip
+	app.Lifecycle().SetOnStarted(func() {
+		systray.SetTooltip("MyReviser - AI Text Revision Tool")
+	})
 
 	// Setup window close intercept
 	mainWindow.SetCloseIntercept(func() {
