@@ -71,6 +71,7 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHot
 	window.SetFixedSize(true)
 
 	window.CenterOnScreen()
+	window.SetIcon(app.Icon())
 
 	prompt := newPermissionPrompt()
 
@@ -482,6 +483,7 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	promptEntry.Bind(w.promptBinding)
 	promptEntry.SetMinRowsVisible(5)
 	promptEntry.Wrapping = fyne.TextWrapWord
+	promptEntry.Validator = nil
 
 	// Character Limit - using number entry
 	charLimitLabel := widget.NewLabel("Character Limit:")

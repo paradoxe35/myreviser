@@ -175,13 +175,16 @@ jobs:
           cat > AppDir/usr/share/applications/myreviser.desktop <<'EOF'
           [Desktop Entry]
           Name=MyReviser
+          GenericName=Text Revision Tool
           Comment=AI-powered text revision tool
           Exec=myreviser
           Icon=myreviser
           Terminal=false
           Type=Application
           Categories=Utility;Office;
-          StartupNotify=false
+          Keywords=text;revision;ai;
+          StartupNotify=true
+          StartupWMClass=MyReviser Settings
           EOF
 
           # Also copy desktop file to root (required by linuxdeploy)
@@ -268,14 +271,16 @@ jobs:
           cat > dist/deb/usr/share/applications/myreviser.desktop <<EOF
           [Desktop Entry]
           Name=MyReviser
+          GenericName=Text Revision Tool
           Comment=AI-powered text revision tool
           Exec=/usr/local/bin/myreviser
           Icon=myreviser
           Terminal=false
           Type=Application
           Categories=Utility;Office;
-          StartupNotify=false
-          StartupWMClass=MyReviser
+          Keywords=text;revision;ai;
+          StartupNotify=true
+          StartupWMClass=MyReviser Settings
           EOF
 
           # Build deb package

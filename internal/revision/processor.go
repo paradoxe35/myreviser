@@ -127,33 +127,27 @@ func (p *Processor) ProcessSelectAll() error {
 
 	logger.Info("Starting select all revision")
 
-	// Initial delay to allow any ongoing clipboard operations to finish
-	// and ensure the hotkey press is fully processed
-	time.Sleep(400 * time.Millisecond)
+	// Wait for hotkey processing and clipboard operations
+	time.Sleep(250 * time.Millisecond)
 
-	// Save current clipboard
 	if err := p.clipboardManager.SaveCurrent(); err != nil {
 		return fmt.Errorf("failed to save clipboard: %w", err)
 	}
 
-	// Small delay saving
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(75 * time.Millisecond)
 
-	// Select all text
 	if err := input.FFISimulateSelectAll(); err != nil {
 		return fmt.Errorf("failed to select all: %w", err)
 	}
 
-	// Small delay after select all before copy
 	time.Sleep(100 * time.Millisecond)
 
-	// Copy to clipboard
 	if err := input.FFISimulateCopy(); err != nil {
 		return fmt.Errorf("failed to copy: %w", err)
 	}
 
-	// Allow clipboard to update before reading (increased from 100ms)
-	time.Sleep(200 * time.Millisecond)
+	// Wait for clipboard synchronization
+	time.Sleep(150 * time.Millisecond)
 
 	// Get text from clipboard
 	text, err := p.clipboardManager.GetText()
@@ -162,26 +156,22 @@ func (p *Processor) ProcessSelectAll() error {
 		return fmt.Errorf("failed to get clipboard text: %w", err)
 	}
 
-	// Validate text is not empty
 	if strings.TrimSpace(text) == "" {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("no text to revise (clipboard is empty or contains only whitespace)")
 	}
 
-	// Process the text
 	revisedText, err := p.reviseText(text)
 	if err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
-	// Select all again and paste revised text (uses FFI helper with built-in delay)
 	if err := input.FFISimulateSelectAll(); err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to select all for paste: %w", err)
 	}
 
-	// add small delay
 	time.Sleep(100 * time.Millisecond)
 
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
@@ -189,7 +179,6 @@ func (p *Processor) ProcessSelectAll() error {
 		return fmt.Errorf("failed to replace text: %w", err)
 	}
 
-	// Restore original clipboard
 	if err := p.clipboardManager.Restore(); err != nil {
 		logger.Error("Failed to restore clipboard", "error", err)
 	}
@@ -218,35 +207,29 @@ func (p *Processor) ProcessSelection() error {
 
 	logger.Info("Starting selection revision")
 
-	// Initial delay to allow any ongoing clipboard operations to finish
-	time.Sleep(400 * time.Millisecond)
+	time.Sleep(250 * time.Millisecond)
 
-	// Capture selected text (saves clipboard, copies, returns text)
 	text, err := p.clipboardManager.CaptureSelectedText()
 	if err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to capture selected text: %w", err)
 	}
 
-	// Validate text is not empty or whitespace-only
 	if strings.TrimSpace(text) == "" {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("no text selected or selection is empty")
 	}
 
-	// Process the text
 	revisedText, err := p.reviseText(text)
 	if err != nil {
 		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
-	// Replace selected text (paste revised text)
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		return fmt.Errorf("failed to replace selected text: %w", err)
 	}
 
-	// Restore original clipboard AFTER paste completes
 	if err := p.clipboardManager.Restore(); err != nil {
 		logger.Warn("Failed to restore clipboard after paste", "error", err)
 	}
@@ -255,36 +238,30 @@ func (p *Processor) ProcessSelection() error {
 	return nil
 }
 
-// reviseText sends text to the AI provider for revision
 func (p *Processor) reviseText(text string) (string, error) {
 	p.mu.Lock()
 	cfg := p.config
 	p.mu.Unlock()
 
-	// Validate text is not empty or whitespace-only
 	trimmedText := strings.TrimSpace(text)
 	if trimmedText == "" {
 		return "", fmt.Errorf("text is empty or contains only whitespace")
 	}
 
-	// Check character limit (use original text length for limit check)
 	if len(text) > cfg.Revision.CharacterLimit {
 		return "", fmt.Errorf("text exceeds character limit (%d > %d)",
 			len(text), cfg.Revision.CharacterLimit)
 	}
 
-	// Minimum text length check (at least 1 character after trimming)
 	if len(trimmedText) < 1 {
 		return "", fmt.Errorf("text too short to revise")
 	}
 
-	// Get current provider
 	provider := p.providerFactory.GetCurrent()
 	if provider == nil {
 		return "", fmt.Errorf("no AI provider configured")
 	}
 
-	// Create context with timeout
 	timeout := time.Duration(p.config.Revision.TimeoutSeconds) * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -297,13 +274,11 @@ func (p *Processor) reviseText(text string) (string, error) {
 		"text_length", len(text),
 	)
 
-	// Revise text with latest system prompt
 	revised, err := provider.ReviseText(ctx, text, p.config.Revision.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("AI revision failed: %w", err)
 	}
 
-	// Validate revised text is not empty
 	revisedTrimmed := strings.TrimSpace(revised)
 	if revisedTrimmed == "" {
 		return "", fmt.Errorf("AI provider returned empty response")

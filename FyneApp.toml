@@ -7,6 +7,6 @@
 
 [LinuxAndBSD]
   GenericName = "Text Revision Tool"
-  Categories = ["Utility", "TextEditor"]
-  Comment = "AI-powered text revision tool for improving grammar and clarity"
-  Keywords = ["text", "revision", "ai", "grammar", "editor"]
+  Categories = ["Utility", "Office"]
+  Comment = "AI-powered text revision tool"
+  Keywords = ["text", "revision", "ai"]

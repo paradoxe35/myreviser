@@ -4,12 +4,12 @@ go 1.24.0
 
 require (
 	fyne.io/fyne/v2 v2.6.3
+	fyne.io/systray v1.11.0
 	github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
 	golang.org/x/sys v0.36.0
 )
 
 require (
-	fyne.io/systray v1.11.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.0 // indirect
