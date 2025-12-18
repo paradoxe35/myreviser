@@ -55,55 +55,60 @@ func NewProcessor(cfg *config.Config) (*Processor, error) {
 	return p, nil
 }
 
-// initializeProviders initializes the AI providers
 func (p *Processor) initializeProviders() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	cfg := p.config
 
-	// Get current provider name
 	currentProvider := cfg.GetCurrentProvider()
 	if currentProvider == "" {
 		return fmt.Errorf("no provider configured")
 	}
 
-	// Get decrypted API key for current provider
 	apiKey, err := cfg.GetCurrentAPIKey()
 	if err != nil {
 		return fmt.Errorf("failed to get API key: %w", err)
 	}
 
-	// Validate API key is not empty
 	if strings.TrimSpace(apiKey) == "" {
 		return fmt.Errorf("API key is empty for provider: %s", currentProvider)
 	}
 
-	// Get provider settings
 	settings := cfg.GetProviderSettings(currentProvider)
 
-	// Register providers based on configuration
-	switch currentProvider {
-	case "openai":
-		provider := ai.NewOpenAIProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
-		p.providerFactory.Register("openai", provider)
-		p.providerFactory.SetCurrent("openai")
+	var provider ai.Provider
 
-	case "claude":
-		provider := ai.NewAnthropicProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
-		p.providerFactory.Register("claude", provider)
-		p.providerFactory.SetCurrent("claude")
-
-	case "gemini":
-		provider := ai.NewGeminiProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
-		p.providerFactory.Register("gemini", provider)
-		p.providerFactory.SetCurrent("gemini")
-
-	default:
-		return fmt.Errorf("unknown provider: %s", currentProvider)
+	if settings.IsCustom {
+		customProvider, err := ai.NewCustomProvider(
+			currentProvider,
+			settings.ProviderType,
+			apiKey,
+			settings.BaseURL,
+			settings.Model,
+			settings.Temperature,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create custom provider: %w", err)
+		}
+		provider = customProvider
+	} else {
+		switch currentProvider {
+		case config.BuiltInOpenAI:
+			provider = ai.NewOpenAIProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		case config.BuiltInClaude:
+			provider = ai.NewAnthropicProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		case config.BuiltInGemini:
+			provider = ai.NewGeminiProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		default:
+			return fmt.Errorf("unknown provider: %s", currentProvider)
+		}
 	}
 
-	logger.Info("AI provider initialized", "provider", currentProvider)
+	p.providerFactory.Register(currentProvider, provider)
+	p.providerFactory.SetCurrent(currentProvider)
+
+	logger.Info("AI provider initialized", "provider", currentProvider, "custom", settings.IsCustom)
 	return nil
 }
 

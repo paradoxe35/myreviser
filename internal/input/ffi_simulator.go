@@ -5,8 +5,8 @@ package input
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../rust-ffi
 
-// Linux
-#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst
+// Linux (includes X11 and Wayland dependencies)
+#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst -lxkbcommon
 
 // macOS
 #cgo darwin LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
@@ -28,7 +28,7 @@ import (
 
 // FFIKeySimulator wraps the Rust FFI key simulator
 type FFIKeySimulator struct {
-	handle C.SimulatorHandle
+	handle C.myreviser_SimulatorHandle
 }
 
 // NewFFIKeySimulator creates a new FFI-based key simulator

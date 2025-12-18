@@ -9,11 +9,17 @@ tab_width = 4
 [export]
 prefix = "myreviser_"
 item_types = ["globals", "enums", "structs", "unions", "typedefs", "opaque", "functions", "constants"]
+# Exclude platform-specific extern declarations that conflict with system headers
+exclude = [
+    "CFRelease", "CFTypeRef", "CFStringRef", "AXUIElementRef", "AXError",
+    "AXUIElementCreateSystemWide", "AXUIElementCopyAttributeValue",
+    "CFStringCreateWithCString", "CFStringGetCStringPtr",
+    "CGEventCreateKeyboardEvent", "CGEventSetFlags", "CGEventPost"
+]
 
 [parse]
 parse_deps = false
 include = ["myreviser-ffi"]
-expand = ["myreviser-ffi"]
 
 [fn]
 rename_args = "None"

@@ -2,41 +2,90 @@
 
 [![Build and Release](https://github.com/paradoxe35/myreviser/actions/workflows/build.yml/badge.svg)](https://github.com/paradoxe35/myreviser/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-1.24%2B-blue)](https://golang.org/dl/)
 
-AI-powered text revision tool with global hotkeys for instant text enhancement across all applications.
+A simple tool that fixes your text with AI, anywhere on your computer.
 
-## Features
+## Why I Built This
 
-- Multiple AI providers: OpenAI, Claude (Anthropic), and Google Gemini
-- Global hotkeys and system tray controls that work across Windows, macOS, and Linux
-- Secure API key storage with encrypted configuration
-- Lightweight native Go application with Rust-powered input handling
-- Configurable prompts, providers, and preferences per user profile
+English isn't my first language. Every time I write an email, a message, or some documentation, I end up with grammar mistakes or typos. I got tired of copying text to ChatGPT, waiting for a response, then copying it back.
+
+I wanted something simpler: press a hotkey, and my text gets fixed. No switching apps, no copy-paste dance. Just write, press a key, done.
+
+That's MyReviser. It sits in your system tray, listens for a hotkey, grabs your text, sends it to an AI, and replaces it with the corrected version. All in a few seconds.
+
+You can also customize the prompt to do other things - translate, summarize, change tone, whatever you need. But for me, it's mostly about fixing my terrible grammar.
+
+## Demo
+
+<!-- TODO: Add a GIF or short video showing how it works -->
+
+_Coming soon: A quick demo showing MyReviser in action_
+
+## How It Works
+
+1. You're writing somewhere (email, browser, notes, anywhere)
+2. Select your text (or use the "select all" hotkey)
+3. Press the hotkey
+4. Your text gets replaced with the AI-improved version
+
+That's it.
 
 ## Installation
 
-- Download the [latest release](https://github.com/paradoxe35/myreviser/releases/latest) for your operating system.
-- Extract or install the package that matches your platform and architecture, then run `MyReviser`.
-- On the first launch, grant the application the accessibility or input permissions prompted by your OS so hotkeys work system-wide.
+Download the [latest release](https://github.com/paradoxe35/myreviser/releases/latest) for your system:
 
-_For detailed build artifacts or manual installation notes, see the release description for the version you choose._
+- **Windows**: Run the installer or extract the portable ZIP
+- **macOS**: Open the DMG, drag to Applications. First launch: right-click > Open
+- **Linux**: Use the .deb package, AppImage, or portable archive
+
+On first launch, grant accessibility/input permissions when prompted - this is needed for global hotkeys to work.
+
+### Linux Users
+
+**Wayland users only**: You need to be in the `input` group for hotkeys to work:
+
+```bash
+sudo usermod -aG input $USER
+# Then log out and log back in
+```
+
+X11 users don't need this - hotkeys work out of the box.
+
+**Required packages** (Debian/Ubuntu - the .deb installs these automatically):
+
+```bash
+sudo apt install libgl1 libx11-6 libxext6 libxcb1 libxinerama1 libxtst6 libxdo3 libxkbcommon0 libxi6 libxcursor1 libxrandr2 libxrender1 libxfixes3 libxxf86vm1
+```
 
 ## Quick Start
 
-1. Launch MyReviser and open the tray menu to configure your preferred AI provider and API key.
-2. Set the global hotkeys you want to use for "Revise Selection" and "Select All & Revise".
-3. Trigger a hotkey in any application—the selected text is automatically sent to the provider and replaced with the improved version.
+1. Launch MyReviser (it appears in your system tray)
+2. Right-click the tray icon > Settings
+3. Add your API key for OpenAI, Claude, or Gemini
+4. Start writing somewhere, select text, press the hotkey
 
-Default hotkeys (changeable under Settings → Hotkeys):
+## Default Hotkeys
 
-- macOS: `Ctrl + Option + Space` (Select All & Revise), `Ctrl + Cmd` (Revise Selection)
-- Windows: `Ctrl + Alt + Space`, `Ctrl + Win`
-- Linux: `Ctrl + Alt + Space`, `Ctrl + Super`
+| Action              | Linux/Windows    | macOS               |
+| ------------------- | ---------------- | ------------------- |
+| Select All & Revise | `Ctrl+Alt+Space` | `Ctrl+Option+Space` |
+| Revise Selection    | `Ctrl+Super`     | `Ctrl+Cmd`          |
+
+You can change these in Settings > Hotkeys.
+
+## Supported AI Providers
+
+| Provider | Example Models                          |
+| -------- | --------------------------------------- |
+| OpenAI   | gpt-4o, gpt-4o-mini                     |
+| Claude   | claude-3-5-haiku, claude-3-5-sonnet     |
+| Gemini   | gemini-2.5-flash, gemini-2.5-flash-lite |
+
+You can also add custom OpenAI-compatible providers (like local LLMs, OpenRouter, Together AI) with their own base URL.
 
 ## Configuration
 
-Configuration files are created automatically after the first run.
+Config files are created on first run:
 
 | Platform | Path                                                  |
 | -------- | ----------------------------------------------------- |
@@ -44,62 +93,35 @@ Configuration files are created automatically after the first run.
 | macOS    | `~/Library/Application Support/MyReviser/config.json` |
 | Windows  | `%USERPROFILE%\.myreviser\config.json`                |
 
-Custom base URLs are supported for OpenAI-compatible endpoints.
+## Building From Source
 
-## Supported AI Providers
+You'll need:
 
-| Provider | Model Examples                                            | Base URL                                    |
-| -------- | --------------------------------------------------------- | ------------------------------------------- |
-| OpenAI   | `gpt-4o`, `gpt-4o-mini`                                   | `https://api.openai.com/v1`                 |
-| Claude   | `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` | `https://api.anthropic.com`                 |
-| Gemini   | `gemini-2.5-flash`, `gemini-2.5-flash-lite`               | `https://generativelanguage.googleapis.com` |
-
-OpenAI-compatible providers (e.g., OpenRouter, Together AI) can be configured by supplying their base URL and API key.
-
-## Rust FFI Core
-
-MyReviser routes global hotkeys, clipboard access, and key simulation through the Rust code in `rust-ffi/` (rdev, arboard, enigo) and exposes those capabilities to Go via CGO. This hybrid approach keeps the UI responsive while providing reliable, cross-platform system integration. For implementation notes, see `rust-ffi/README.md`.
-
-## Development
+- Go 1.24+ with `CGO_ENABLED=1`
+- Rust toolchain (stable)
+- Platform dependencies (see `rust-ffi/README.md`)
 
 ```bash
-# Build for the current platform
-make build
-
-# Build release packages for all supported platforms
-make package-all
-
-# Run the app locally
-make run
-
-# Run tests
-make test
+make build    # Build for current platform
+make run      # Run locally
+make test     # Run tests
 ```
 
-## Contributing
-
-We welcome issues and pull requests. Before contributing, make sure you have:
-
-- Go 1.24 or newer with `CGO_ENABLED=1`
-- A Rust toolchain (stable) and `cargo` (the build script pulls `cbindgen` as a `[build-dependency]`, so no manual install is required)
-- `make` and the platform dependencies described in `rust-ffi/README.md`
-
-Check the `rust-ffi/` directory when working on system integrations.
+The app uses a Go frontend (Fyne UI) with a Rust backend for system input handling (hotkeys, clipboard, key simulation). This hybrid approach gives us reliable cross-platform support.
 
 ## Troubleshooting
 
-- Ensure only one instance of MyReviser is running (check the system tray).
-- Review logs at `~/.myreviser/logs/` if revisions fail to send.
-- Confirm the application has accessibility/input permissions when hotkeys do not trigger.
+**Hotkeys not working?**
+
+- Check that only one instance is running (look in system tray)
+- On macOS: grant Accessibility permissions in System Settings
+- On Linux Wayland: make sure you're in the `input` group (X11 doesn't need this)
+
+**Revisions failing?**
+
+- Check your API key is valid
+- Look at logs in `~/.myreviser/logs/`
 
 ## License
 
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-Built with [Fyne](https://fyne.io/), a cross-platform GUI framework for Go.
-
----
-
-**Note:** You need valid API keys from your chosen AI provider. Sign up at the [OpenAI Platform](https://platform.openai.com/), [Anthropic Console](https://console.anthropic.com/), or [Google AI Studio](https://makersuite.google.com/).
+MIT - see [LICENSE](LICENSE)

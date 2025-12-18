@@ -12,10 +12,11 @@ crate-type = ["staticlib"]  # Static library for Go CGO
 
 [dependencies]
 # Core dependencies for system input
-# Use rustdesk fork which fixes macOS GUI compatibility issues (event tap conflicts with Fyne)
+# Use rustdesk-org/rdev fork for Linux Wayland support (grab uses evdev, works on X11 and Wayland)
+# This fork is required for macOS compatibility and has Wayland fixes
 rdev = { git = "https://github.com/rustdesk-org/rdev" }
-arboard = "3.6"       # Clipboard management
-enigo = "0.6"         # Keyboard/mouse simulation
+arboard = { version = "3.6", features = ["wayland-data-control"] }  # Clipboard with Wayland support
+enigo = { version = "0.6", features = ["wayland", "x11rb"] }  # Keyboard simulation with Wayland and X11 support
 
 # Async runtime
 tokio = { version = "1.41", features = ["rt", "sync", "time"] }

@@ -106,11 +106,11 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag or use commit SHA for manual dispatch
+          # Extract version from tag or use 0.0.0 for manual dispatch (fyne requires x.y.z format)
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="dev-${GITHUB_SHA::7}"
+            VERSION="0.0.0"
           fi
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
 
@@ -240,7 +240,7 @@ jobs:
           Architecture: ${{ matrix.arch }}
           Maintainer: Paradoxe Ng <contact@pngwasi.me>
           Homepage: https://github.com/paradoxe35/myreviser
-          Depends: libc6, libgl1, libx11-6, libxinerama1, libxtst6, libxdo3
+          Depends: libc6, libgl1, libx11-6, libxext6, libxcb1, libxinerama1, libxtst6, libxdo3, libxkbcommon0, libxi6, libxcursor1, libxrandr2, libxrender1, libxfixes3, libxxf86vm1
           Description: AI-powered text revision tool with Rust FFI
            MyReviser is a system tray application that provides global hotkeys
            for instant text enhancement using AI providers (OpenAI, Claude, Gemini).
@@ -376,11 +376,11 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag or use commit SHA for manual dispatch
+          # Extract version from tag or use 0.0.0 for manual dispatch (fyne requires x.y.z format)
           if ("${{ github.ref }}" -like "refs/tags/*") {
             $VERSION = "${{ github.ref_name }}" -replace '^v',''
           } else {
-            $VERSION = "dev-${{ github.sha }}".Substring(0, 11)
+            $VERSION = "0.0.0"
           }
           $BUILD_NUMBER = "${{ github.run_number }}"
 
@@ -660,11 +660,11 @@ jobs:
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag or use commit SHA for manual dispatch
+          # Extract version from tag or use 0.0.0 for manual dispatch (fyne requires x.y.z format)
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="dev-${GITHUB_SHA::7}"
+            VERSION="0.0.0"
           fi
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
 
@@ -890,9 +890,22 @@ jobs:
 
             ## Requirements
 
-            **Linux**: X11, OpenGL (libgl1), libX11, libXtst
+            **Linux**:
+            - X11 or Wayland session
+            - **Wayland users only**: Add yourself to the `input` group for hotkeys to work:
+              ```bash
+              sudo usermod -aG input $USER
+              # Then log out and log back in
+              ```
+            - X11 users: No special setup needed, hotkeys work out of the box
+            - Required packages (Debian/Ubuntu):
+              ```bash
+              sudo apt install libgl1 libx11-6 libxext6 libxcb1 libxinerama1 libxtst6 libxdo3 libxkbcommon0 libxi6 libxcursor1 libxrandr2 libxrender1 libxfixes3 libxxf86vm1
+              ```
+            - Note: The .deb package installs required packages automatically
+
             **macOS**: macOS 10.13+, accessibility permissions required
             **Windows**: Windows 10+
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
