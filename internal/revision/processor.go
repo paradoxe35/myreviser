@@ -35,9 +35,9 @@ func NewProcessor(cfg *config.Config) (*Processor, error) {
 		clipboardManager: clipManager,
 	}
 
-	// Initialize AI providers
+	// Initialize AI providers (don't fail startup if not configured)
 	if err := p.initializeProviders(); err != nil {
-		return nil, err
+		logger.Warn("AI provider not configured at startup", "error", err)
 	}
 
 	// Register config change listener
@@ -48,7 +48,7 @@ func NewProcessor(cfg *config.Config) (*Processor, error) {
 
 		// Reinitialize providers with new config
 		if err := p.initializeProviders(); err != nil {
-			logger.Error("Failed to reinitialize providers on config change", "error", err)
+			logger.Warn("AI provider not configured", "error", err)
 		}
 	})
 
@@ -259,7 +259,7 @@ func (p *Processor) reviseText(text string) (string, error) {
 
 	provider := p.providerFactory.GetCurrent()
 	if provider == nil {
-		return "", fmt.Errorf("no AI provider configured")
+		return "", fmt.Errorf("no AI provider configured - please configure your API key in Settings")
 	}
 
 	timeout := time.Duration(p.config.Revision.TimeoutSeconds) * time.Second
