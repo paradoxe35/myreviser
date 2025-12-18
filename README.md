@@ -125,11 +125,3 @@ The app uses a Go frontend (Fyne UI) with a Rust backend for system input handli
 ## License
 
 MIT - see [LICENSE](LICENSE)
-
-## Acknowledgments
-
-Built with [Fyne](https://fyne.io/) for the UI and [rdev](https://github.com/rustdesk-org/rdev) for cross-platform input handling.
-
----
-
-**Note**: You need an API key from your AI provider. Get one at [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), or [Google AI Studio](https://makersuite.google.com/).
