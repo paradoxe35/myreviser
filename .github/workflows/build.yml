@@ -892,14 +892,19 @@ jobs:
 
             **Linux**:
             - X11 or Wayland session
+            - **Wayland users**: Add yourself to the `input` group for hotkeys to work:
+              ```bash
+              sudo usermod -aG input $USER
+              # Then log out and log back in
+              ```
             - Required packages (Debian/Ubuntu):
               ```bash
               sudo apt install libgl1 libx11-6 libxext6 libxcb1 libxinerama1 libxtst6 libxdo3 libxkbcommon0 libxi6 libxcursor1 libxrandr2 libxrender1 libxfixes3 libxxf86vm1
               ```
-            - Note: The .deb package installs these automatically
+            - Note: The .deb package installs required packages automatically
 
             **macOS**: macOS 10.13+, accessibility permissions required
             **Windows**: Windows 10+
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false

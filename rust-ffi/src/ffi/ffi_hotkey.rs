@@ -3,7 +3,14 @@ use std::sync::Arc;
 use std::thread;
 
 use parking_lot::Mutex;
-use rdev::{listen, Event, EventType, Key};
+use rdev::{Event, EventType, Key};
+
+// Use start_grab_listen on Linux (works on both X11 and Wayland via evdev)
+// Use listen on macOS and Windows (works fine there)
+#[cfg(target_os = "linux")]
+use rdev::start_grab_listen;
+#[cfg(not(target_os = "linux"))]
+use rdev::listen;
 
 use super::ffi_types::*;
 
@@ -131,106 +138,153 @@ impl SimpleHotkeyManager {
             let mut shift_pressed = false;
             let mut meta_pressed = false;
 
-            let callback = move |event: Event| {
-                // Catch panics to prevent crashing the app
-                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    if !*active_flag.lock() {
-                        return;
-                    }
+            // Process an event and return whether it was handled
+            // This logic is shared between grab and listen callbacks
+            let process_event = |event: &Event,
+                                 ctrl: &mut bool,
+                                 alt: &mut bool,
+                                 shift: &mut bool,
+                                 meta: &mut bool,
+                                 bindings: &Arc<Mutex<Vec<HotkeyBinding>>>,
+                                 active_flag: &Arc<Mutex<bool>>| {
+                if !*active_flag.lock() {
+                    return;
+                }
 
-                    match event.event_type {
-                        EventType::KeyPress(key) => {
-                            // Track previous modifier states
-                            let prev_ctrl = ctrl_pressed;
-                            let prev_alt = alt_pressed;
-                            let prev_shift = shift_pressed;
-                            let prev_meta = meta_pressed;
+                match event.event_type {
+                    EventType::KeyPress(key) => {
+                        // Track previous modifier states
+                        let prev_ctrl = *ctrl;
+                        let prev_alt = *alt;
+                        let prev_shift = *shift;
+                        let prev_meta = *meta;
 
-                            // Update modifier states
-                            match key {
-                                Key::ControlLeft | Key::ControlRight => ctrl_pressed = true,
-                                Key::Alt | Key::AltGr => alt_pressed = true,
-                                Key::ShiftLeft | Key::ShiftRight => shift_pressed = true,
-                                Key::MetaLeft | Key::MetaRight => meta_pressed = true,
-                                _ => {}
-                            }
+                        // Update modifier states
+                        match key {
+                            Key::ControlLeft | Key::ControlRight => *ctrl = true,
+                            Key::Alt | Key::AltGr => *alt = true,
+                            Key::ShiftLeft | Key::ShiftRight => *shift = true,
+                            Key::MetaLeft | Key::MetaRight => *meta = true,
+                            _ => {}
+                        }
 
-                            // Check bindings after modifier state update
-                            let bindings_lock = bindings.lock();
+                        // Check bindings after modifier state update
+                        let bindings_lock = bindings.lock();
 
-                            for binding in bindings_lock.iter() {
-                                // For modifier-only bindings (empty key)
-                                if binding.key.is_empty() {
-                                    // Trigger when all required modifiers are pressed and state changed
-                                    if matches_modifier_only_binding(
-                                        &binding.modifiers,
-                                        ctrl_pressed,
-                                        alt_pressed,
-                                        shift_pressed,
-                                        meta_pressed,
-                                        prev_ctrl,
-                                        prev_alt,
-                                        prev_shift,
-                                        prev_meta,
-                                    ) {
-                                        tracing::info!(
-                                            "Modifier-only hotkey triggered: {} (action: {})",
-                                            binding.binding,
-                                            binding.action
-                                        );
-                                        // Trigger callback
-                                        if let Ok(action_cstr) =
-                                            std::ffi::CString::new(binding.action.clone())
-                                        {
-                                            let action_ptr = action_cstr.into_raw();
-                                            (binding.callback)(action_ptr);
-                                        }
+                        for binding in bindings_lock.iter() {
+                            // For modifier-only bindings (empty key)
+                            if binding.key.is_empty() {
+                                // Trigger when all required modifiers are pressed and state changed
+                                if matches_modifier_only_binding(
+                                    &binding.modifiers,
+                                    *ctrl,
+                                    *alt,
+                                    *shift,
+                                    *meta,
+                                    prev_ctrl,
+                                    prev_alt,
+                                    prev_shift,
+                                    prev_meta,
+                                ) {
+                                    tracing::info!(
+                                        "Modifier-only hotkey triggered: {} (action: {})",
+                                        binding.binding,
+                                        binding.action
+                                    );
+                                    // Trigger callback
+                                    if let Ok(action_cstr) =
+                                        std::ffi::CString::new(binding.action.clone())
+                                    {
+                                        let action_ptr = action_cstr.into_raw();
+                                        (binding.callback)(action_ptr);
                                     }
-                                } else {
-                                    // For regular key bindings
-                                    let key_str = key_to_string(&key);
-                                    if matches_binding(
-                                        &binding.modifiers,
-                                        &binding.key,
-                                        ctrl_pressed,
-                                        alt_pressed,
-                                        shift_pressed,
-                                        meta_pressed,
-                                        &key_str,
-                                    ) {
-                                        tracing::info!(
-                                            "Hotkey triggered: {} (action: {})",
-                                            binding.binding,
-                                            binding.action
-                                        );
-                                        // Trigger callback
-                                        if let Ok(action_cstr) =
-                                            std::ffi::CString::new(binding.action.clone())
-                                        {
-                                            let action_ptr = action_cstr.into_raw();
-                                            (binding.callback)(action_ptr);
-                                        }
+                                }
+                            } else {
+                                // For regular key bindings
+                                let key_str = key_to_string(&key);
+                                if matches_binding(
+                                    &binding.modifiers,
+                                    &binding.key,
+                                    *ctrl,
+                                    *alt,
+                                    *shift,
+                                    *meta,
+                                    &key_str,
+                                ) {
+                                    tracing::info!(
+                                        "Hotkey triggered: {} (action: {})",
+                                        binding.binding,
+                                        binding.action
+                                    );
+                                    // Trigger callback
+                                    if let Ok(action_cstr) =
+                                        std::ffi::CString::new(binding.action.clone())
+                                    {
+                                        let action_ptr = action_cstr.into_raw();
+                                        (binding.callback)(action_ptr);
                                     }
                                 }
                             }
                         }
-                        EventType::KeyRelease(key) => {
-                            // Update modifier states
-                            match key {
-                                Key::ControlLeft | Key::ControlRight => ctrl_pressed = false,
-                                Key::Alt | Key::AltGr => alt_pressed = false,
-                                Key::ShiftLeft | Key::ShiftRight => shift_pressed = false,
-                                Key::MetaLeft | Key::MetaRight => meta_pressed = false,
-                                _ => {}
-                            }
-                        }
-                        _ => {}
                     }
-                }));
+                    EventType::KeyRelease(key) => {
+                        // Update modifier states
+                        match key {
+                            Key::ControlLeft | Key::ControlRight => *ctrl = false,
+                            Key::Alt | Key::AltGr => *alt = false,
+                            Key::ShiftLeft | Key::ShiftRight => *shift = false,
+                            Key::MetaLeft | Key::MetaRight => *meta = false,
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
             };
 
-            if let Err(e) = listen(callback) {
-                eprintln!("Hotkey listener error: {:?}", e);
+            // On Linux, use start_grab_listen() which works on both X11 and Wayland via evdev
+            // On macOS and Windows, use listen() which works natively
+            #[cfg(target_os = "linux")]
+            {
+                let callback = move |event: Event| -> Option<Event> {
+                    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        process_event(
+                            &event,
+                            &mut ctrl_pressed,
+                            &mut alt_pressed,
+                            &mut shift_pressed,
+                            &mut meta_pressed,
+                            &bindings,
+                            &active_flag,
+                        );
+                    }));
+                    // Always pass the event through (don't consume it)
+                    Some(event)
+                };
+
+                if let Err(e) = start_grab_listen(callback) {
+                    eprintln!("Hotkey grab error: {:?}", e);
+                }
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            {
+                let callback = move |event: Event| {
+                    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        process_event(
+                            &event,
+                            &mut ctrl_pressed,
+                            &mut alt_pressed,
+                            &mut shift_pressed,
+                            &mut meta_pressed,
+                            &bindings,
+                            &active_flag,
+                        );
+                    }));
+                };
+
+                if let Err(e) = listen(callback) {
+                    eprintln!("Hotkey listener error: {:?}", e);
+                }
             }
         });
 
