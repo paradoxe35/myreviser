@@ -17,24 +17,13 @@ func NewCustomProvider(name, providerType, apiKey, baseURL, model string, temper
 	if baseURL == "" {
 		return nil, fmt.Errorf("base URL is required for custom providers")
 	}
-	if providerType == "" {
-		providerType = config.ProviderTypeOpenAICompatible
-	}
-
-	var inner Provider
-	switch providerType {
-	case config.ProviderTypeOpenAICompatible:
-		inner = NewOpenAIProvider(apiKey, baseURL, model, temperature)
-	case config.ProviderTypeAnthropicCompatible:
-		inner = NewAnthropicProvider(apiKey, baseURL, model, temperature)
-	default:
-		return nil, fmt.Errorf("unknown provider type: %s", providerType)
-	}
+	// Custom providers always use OpenAI-compatible API
+	providerType = config.ProviderTypeOpenAICompatible
 
 	return &CustomProvider{
 		name:         name,
 		providerType: providerType,
-		inner:        inner,
+		inner:        NewOpenAIProvider(apiKey, baseURL, model, temperature),
 	}, nil
 }
 

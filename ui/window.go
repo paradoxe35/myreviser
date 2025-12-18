@@ -833,7 +833,6 @@ func (w *MainWindow) restartApplication() {
 
 func (w *MainWindow) updateProviderUI(provider string) {
 	isCustom := w.config.IsCustomProvider(provider)
-	settings := w.config.GetProviderSettings(provider)
 
 	if w.deleteProviderButton != nil {
 		if isCustom {
@@ -855,12 +854,8 @@ func (w *MainWindow) updateProviderUI(provider string) {
 	}
 
 	if w.providerTypeLabel != nil {
-		if isCustom && settings.ProviderType != "" {
-			typeText := "OpenAI Compatible"
-			if settings.ProviderType == config.ProviderTypeAnthropicCompatible {
-				typeText = "Anthropic Compatible"
-			}
-			w.providerTypeLabel.SetText("Type: " + typeText)
+		if isCustom {
+			w.providerTypeLabel.SetText("Type: OpenAI Compatible")
 			w.providerTypeLabel.Show()
 		} else {
 			w.providerTypeLabel.Hide()
@@ -882,12 +877,6 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 	nameEntry := widget.NewEntry()
 	nameEntry.PlaceHolder = "my-custom-provider"
 
-	typeSelect := widget.NewSelect(
-		[]string{"OpenAI Compatible", "Anthropic Compatible"},
-		nil,
-	)
-	typeSelect.SetSelected("OpenAI Compatible")
-
 	baseURLEntry := widget.NewEntry()
 	baseURLEntry.PlaceHolder = "https://api.example.com/v1"
 
@@ -901,15 +890,12 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 	statusLabel.Wrapping = fyne.TextWrapWord
 
 	fetchModelsBtn := widget.NewButton("Fetch Models", func() {
-		w.fetchModelsForCustomProvider(typeSelect.Selected, apiKeyEntry.Text, baseURLEntry.Text, modelEntry, statusLabel)
+		w.fetchModelsForCustomProvider(apiKeyEntry.Text, baseURLEntry.Text, modelEntry, statusLabel)
 	})
 
 	form := container.NewVBox(
 		widget.NewLabel("Provider Name:"),
 		nameEntry,
-		widget.NewSeparator(),
-		widget.NewLabel("API Format:"),
-		typeSelect,
 		widget.NewSeparator(),
 		widget.NewLabel("Base URL (required):"),
 		baseURLEntry,
@@ -947,17 +933,12 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 				return
 			}
 
-			providerType := config.ProviderTypeOpenAICompatible
-			if typeSelect.Selected == "Anthropic Compatible" {
-				providerType = config.ProviderTypeAnthropicCompatible
-			}
-
 			settings := config.ProviderSettings{
 				BaseURL:      baseURL,
 				Model:        strings.TrimSpace(modelEntry.Text),
 				Temperature:  1.0,
 				IsCustom:     true,
-				ProviderType: providerType,
+				ProviderType: config.ProviderTypeOpenAICompatible,
 			}
 
 			if err := w.config.AddCustomProvider(name, settings); err != nil {
@@ -1026,15 +1007,10 @@ func (w *MainWindow) showDeleteProviderConfirmation() {
 	)
 }
 
-func (w *MainWindow) fetchModelsForCustomProvider(typeSelection, apiKey, baseURL string, modelEntry *widget.Entry, statusLabel *widget.Label) {
+func (w *MainWindow) fetchModelsForCustomProvider(apiKey, baseURL string, modelEntry *widget.Entry, statusLabel *widget.Label) {
 	if apiKey == "" || baseURL == "" {
 		statusLabel.SetText("API key and Base URL are required")
 		return
-	}
-
-	providerType := config.ProviderTypeOpenAICompatible
-	if typeSelection == "Anthropic Compatible" {
-		providerType = config.ProviderTypeAnthropicCompatible
 	}
 
 	statusLabel.SetText("Fetching models...")
@@ -1043,7 +1019,7 @@ func (w *MainWindow) fetchModelsForCustomProvider(typeSelection, apiKey, baseURL
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		models, err := ai.FetchModels(ctx, providerType, apiKey, baseURL)
+		models, err := ai.FetchModels(ctx, apiKey, baseURL)
 
 		fyne.Do(func() {
 			if err != nil {

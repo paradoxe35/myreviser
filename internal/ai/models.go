@@ -9,8 +9,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/paradoxe35/myreviser/internal/config"
 )
 
 type ModelInfo struct {
@@ -57,25 +55,9 @@ func FetchModelsOpenAI(ctx context.Context, apiKey, baseURL string) ([]ModelInfo
 	return response.Data, nil
 }
 
-func FetchModelsAnthropic(ctx context.Context, apiKey, baseURL string) ([]ModelInfo, error) {
-	return []ModelInfo{
-		{ID: "claude-3-5-sonnet-20241022"},
-		{ID: "claude-3-5-haiku-20241022"},
-		{ID: "claude-3-opus-20240229"},
-		{ID: "claude-3-sonnet-20240229"},
-		{ID: "claude-3-haiku-20240307"},
-	}, nil
-}
-
-func FetchModels(ctx context.Context, providerType, apiKey, baseURL string) ([]ModelInfo, error) {
-	switch providerType {
-	case config.ProviderTypeOpenAICompatible:
-		return FetchModelsOpenAI(ctx, apiKey, baseURL)
-	case config.ProviderTypeAnthropicCompatible:
-		return FetchModelsAnthropic(ctx, apiKey, baseURL)
-	default:
-		return nil, fmt.Errorf("unknown provider type: %s", providerType)
-	}
+// FetchModels fetches available models from an OpenAI-compatible endpoint
+func FetchModels(ctx context.Context, apiKey, baseURL string) ([]ModelInfo, error) {
+	return FetchModelsOpenAI(ctx, apiKey, baseURL)
 }
 
 func truncateString(s string, maxLen int) string {

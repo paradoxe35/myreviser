@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	ProviderTypeOpenAICompatible    = "openai-compatible"
-	ProviderTypeAnthropicCompatible = "anthropic-compatible"
+	ProviderTypeOpenAICompatible = "openai-compatible"
 
 	BuiltInOpenAI = "openai"
 	BuiltInClaude = "claude"
