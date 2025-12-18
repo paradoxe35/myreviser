@@ -5,8 +5,8 @@ package input
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../rust-ffi
 
-// Linux
-#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst -lXi
+// Linux (includes X11 and Wayland dependencies)
+#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst -lXi -lxkbcommon
 
 // macOS
 #cgo darwin LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
@@ -36,7 +36,7 @@ import (
 type FFIHotkeyManager struct {
 	mu          sync.RWMutex
 	ffiMu       sync.Mutex // Separate mutex for FFI calls
-	handle      C.HotkeyManagerHandle
+	handle      C.myreviser_HotkeyManagerHandle
 	handlers    map[string]func()
 	active      bool
 	disabled    bool
@@ -127,7 +127,7 @@ func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()
 		h.handle,
 		cBinding,
 		cAction,
-		C.HotkeyCallback(C.hotkeyCallbackGateway),
+		C.myreviser_HotkeyCallback(C.hotkeyCallbackGateway),
 	)
 
 	if result != 0 {

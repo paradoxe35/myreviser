@@ -5,8 +5,8 @@ package input
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../rust-ffi
 
-// Linux static linking
-#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst
+// Linux static linking (includes X11 and Wayland dependencies)
+#cgo linux LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a -lpthread -ldl -lm -lxdo -lX11 -lXtst -lxkbcommon
 
 // macOS linking (partial static, frameworks required)
 #cgo darwin LDFLAGS: ${SRCDIR}/../../lib/libmyreviser_ffi.a
@@ -28,7 +28,7 @@ import (
 
 // FFIClipboardManager wraps the Rust FFI clipboard manager
 type FFIClipboardManager struct {
-	handle C.ClipboardHandle
+	handle C.myreviser_ClipboardHandle
 }
 
 // NewFFIClipboardManager creates a new FFI-based clipboard manager

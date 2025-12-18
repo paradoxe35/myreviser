@@ -6,9 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"sync"
 
 	"github.com/paradoxe35/myreviser/internal/utils"
+)
+
+const (
+	ProviderTypeOpenAICompatible    = "openai-compatible"
+	ProviderTypeAnthropicCompatible = "anthropic-compatible"
+
+	BuiltInOpenAI = "openai"
+	BuiltInClaude = "claude"
+	BuiltInGemini = "gemini"
 )
 
 type Config struct {
@@ -21,10 +31,12 @@ type Config struct {
 }
 
 type ProviderSettings struct {
-	APIKey      string  `json:"api_key"`
-	BaseURL     string  `json:"base_url,omitempty"`
-	Model       string  `json:"model,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
+	APIKey       string  `json:"api_key"`
+	BaseURL      string  `json:"base_url,omitempty"`
+	Model        string  `json:"model,omitempty"`
+	Temperature  float64 `json:"temperature,omitempty"`
+	IsCustom     bool    `json:"is_custom,omitempty"`
+	ProviderType string  `json:"provider_type,omitempty"`
 }
 
 type AIProviderConfig struct {
@@ -319,4 +331,96 @@ func (c *Config) SetCurrentProvider(provider string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.AIProvider.Provider = provider
+}
+
+func BuiltInProviders() []string {
+	return []string{BuiltInOpenAI, BuiltInClaude, BuiltInGemini}
+}
+
+func IsBuiltInProvider(name string) bool {
+	for _, p := range BuiltInProviders() {
+		if p == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) GetAllProviderNames() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	names := make([]string, 0)
+	for _, name := range BuiltInProviders() {
+		names = append(names, name)
+	}
+
+	customNames := make([]string, 0)
+	for name, settings := range c.AIProvider.Providers {
+		if settings.IsCustom {
+			customNames = append(customNames, name)
+		}
+	}
+	sort.Strings(customNames)
+	names = append(names, customNames...)
+	return names
+}
+
+func (c *Config) AddCustomProvider(name string, settings ProviderSettings) error {
+	if IsBuiltInProvider(name) {
+		return fmt.Errorf("cannot use built-in provider name: %s", name)
+	}
+	if name == "" {
+		return fmt.Errorf("provider name cannot be empty")
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.AIProvider.Providers == nil {
+		c.AIProvider.Providers = make(map[string]ProviderSettings)
+	}
+
+	if _, exists := c.AIProvider.Providers[name]; exists {
+		return fmt.Errorf("provider with name '%s' already exists", name)
+	}
+
+	settings.IsCustom = true
+	c.AIProvider.Providers[name] = settings
+	return nil
+}
+
+func (c *Config) DeleteCustomProvider(name string) error {
+	if IsBuiltInProvider(name) {
+		return fmt.Errorf("cannot delete built-in provider: %s", name)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	settings, exists := c.AIProvider.Providers[name]
+	if !exists {
+		return fmt.Errorf("provider '%s' not found", name)
+	}
+	if !settings.IsCustom {
+		return fmt.Errorf("cannot delete non-custom provider: %s", name)
+	}
+
+	delete(c.AIProvider.Providers, name)
+
+	if c.AIProvider.Provider == name {
+		c.AIProvider.Provider = BuiltInOpenAI
+	}
+
+	return nil
+}
+
+func (c *Config) IsCustomProvider(name string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if settings, exists := c.AIProvider.Providers[name]; exists {
+		return settings.IsCustom
+	}
+	return false
 }
