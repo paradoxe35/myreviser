@@ -5,14 +5,32 @@ use std::thread;
 use parking_lot::Mutex;
 use rdev::{Event, EventType, Key};
 
-// Use start_grab_listen on Linux (works on both X11 and Wayland via evdev)
-// Use listen on macOS and Windows (works fine there)
-#[cfg(target_os = "linux")]
-use rdev::start_grab_listen;
+// On Linux: use listen() for X11 (no special permissions needed)
+//           use start_grab_listen() for Wayland (needs input group)
+// On macOS/Windows: use listen() which works natively
 #[cfg(not(target_os = "linux"))]
 use rdev::listen;
+#[cfg(target_os = "linux")]
+use rdev::{listen, start_grab_listen};
 
 use super::ffi_types::*;
+
+/// Detect if running on Wayland
+#[cfg(target_os = "linux")]
+fn is_wayland() -> bool {
+    // Check XDG_SESSION_TYPE first (most reliable)
+    if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
+        if session_type.to_lowercase() == "wayland" {
+            return true;
+        }
+        if session_type.to_lowercase() == "x11" {
+            return false;
+        }
+    }
+
+    // Fallback: check if WAYLAND_DISPLAY is set
+    std::env::var("WAYLAND_DISPLAY").is_ok()
+}
 
 /// Hotkey callback function type
 /// The callback receives the action string that was registered
@@ -241,28 +259,53 @@ impl SimpleHotkeyManager {
                 }
             };
 
-            // On Linux, use start_grab_listen() which works on both X11 and Wayland via evdev
-            // On macOS and Windows, use listen() which works natively
+            // On Linux: use listen() for X11, start_grab_listen() for Wayland
+            // On macOS/Windows: use listen() which works natively
             #[cfg(target_os = "linux")]
             {
-                let callback = move |event: Event| -> Option<Event> {
-                    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        process_event(
-                            &event,
-                            &mut ctrl_pressed,
-                            &mut alt_pressed,
-                            &mut shift_pressed,
-                            &mut meta_pressed,
-                            &bindings,
-                            &active_flag,
-                        );
-                    }));
-                    // Always pass the event through (don't consume it)
-                    Some(event)
-                };
+                if is_wayland() {
+                    // Wayland: use start_grab_listen (evdev) - requires input group
+                    tracing::info!("Wayland session detected, using evdev grab for hotkeys");
+                    let callback = move |event: Event| -> Option<Event> {
+                        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            process_event(
+                                &event,
+                                &mut ctrl_pressed,
+                                &mut alt_pressed,
+                                &mut shift_pressed,
+                                &mut meta_pressed,
+                                &bindings,
+                                &active_flag,
+                            );
+                        }));
+                        // Always pass the event through (don't consume it)
+                        Some(event)
+                    };
 
-                if let Err(e) = start_grab_listen(callback) {
-                    eprintln!("Hotkey grab error: {:?}", e);
+                    if let Err(e) = start_grab_listen(callback) {
+                        eprintln!("Hotkey grab error (Wayland): {:?}", e);
+                        eprintln!("Hint: Make sure your user is in the 'input' group: sudo usermod -aG input $USER");
+                    }
+                } else {
+                    // X11: use listen (X11 APIs) - no special permissions needed
+                    tracing::info!("X11 session detected, using X11 listener for hotkeys");
+                    let callback = move |event: Event| {
+                        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            process_event(
+                                &event,
+                                &mut ctrl_pressed,
+                                &mut alt_pressed,
+                                &mut shift_pressed,
+                                &mut meta_pressed,
+                                &bindings,
+                                &active_flag,
+                            );
+                        }));
+                    };
+
+                    if let Err(e) = listen(callback) {
+                        eprintln!("Hotkey listener error (X11): {:?}", e);
+                    }
                 }
             }
 

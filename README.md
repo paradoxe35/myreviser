@@ -42,14 +42,14 @@ On first launch, grant accessibility/input permissions when prompted - this is n
 
 ### Linux Users
 
-**For Wayland support**, your user needs to be in the `input` group to access keyboard events:
+**Wayland users only**: You need to be in the `input` group for hotkeys to work:
 
 ```bash
 sudo usermod -aG input $USER
 # Then log out and log back in
 ```
 
-Without this, hotkeys won't work on Wayland sessions.
+X11 users don't need this - hotkeys work out of the box.
 
 **Required packages** (Debian/Ubuntu - the .deb installs these automatically):
 
@@ -115,7 +115,7 @@ The app uses a Go frontend (Fyne UI) with a Rust backend for system input handli
 
 - Check that only one instance is running (look in system tray)
 - On macOS: grant Accessibility permissions in System Settings
-- On Linux Wayland: make sure you're in the `input` group
+- On Linux Wayland: make sure you're in the `input` group (X11 doesn't need this)
 
 **Revisions failing?**
 

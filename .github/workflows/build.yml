@@ -892,11 +892,12 @@ jobs:
 
             **Linux**:
             - X11 or Wayland session
-            - **Wayland users**: Add yourself to the `input` group for hotkeys to work:
+            - **Wayland users only**: Add yourself to the `input` group for hotkeys to work:
               ```bash
               sudo usermod -aG input $USER
               # Then log out and log back in
               ```
+            - X11 users: No special setup needed, hotkeys work out of the box
             - Required packages (Debian/Ubuntu):
               ```bash
               sudo apt install libgl1 libx11-6 libxext6 libxcb1 libxinerama1 libxtst6 libxdo3 libxkbcommon0 libxi6 libxcursor1 libxrandr2 libxrender1 libxfixes3 libxxf86vm1
