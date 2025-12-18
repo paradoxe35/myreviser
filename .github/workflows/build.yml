@@ -106,11 +106,11 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag or use commit SHA for manual dispatch
+          # Extract version from tag or use 0.0.0 for manual dispatch (fyne requires x.y.z format)
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="dev-${GITHUB_SHA::7}"
+            VERSION="0.0.0"
           fi
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
 
@@ -376,11 +376,11 @@ jobs:
           GOOS: windows
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag or use commit SHA for manual dispatch
+          # Extract version from tag or use 0.0.0 for manual dispatch (fyne requires x.y.z format)
           if ("${{ github.ref }}" -like "refs/tags/*") {
             $VERSION = "${{ github.ref_name }}" -replace '^v',''
           } else {
-            $VERSION = "dev-${{ github.sha }}".Substring(0, 11)
+            $VERSION = "0.0.0"
           }
           $BUILD_NUMBER = "${{ github.run_number }}"
 
@@ -660,11 +660,11 @@ jobs:
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
         run: |
-          # Extract version from tag or use commit SHA for manual dispatch
+          # Extract version from tag or use 0.0.0 for manual dispatch (fyne requires x.y.z format)
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
-            VERSION="dev-${GITHUB_SHA::7}"
+            VERSION="0.0.0"
           fi
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
 
