@@ -351,7 +351,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	modelEntry.PlaceHolder = "e.g., gpt-4o"
 	modelEntry.Validator = nil // Disable validation icon
 
-	// Temperature section
+	// Temperature section (slider 0-2)
 	tempLabel := widget.NewLabel("Temp:")
 	tempValue := widget.NewLabel("1.0")
 	tempSlider := widget.NewSlider(0, 2)
@@ -366,8 +366,8 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 
 	// Model and Temperature on same row
 	modelTempRow := container.NewGridWithColumns(2,
-		container.NewBorder(nil, nil, modelLabel, nil, modelEntry),
-		container.NewBorder(nil, nil, tempLabel, tempValue, tempSlider),
+		container.NewVBox(modelLabel, modelEntry),
+		container.NewVBox(container.NewHBox(tempLabel, tempValue), tempSlider),
 	)
 
 	// Base URL section (for custom endpoints - only for OpenAI)
