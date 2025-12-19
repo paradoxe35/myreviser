@@ -17,9 +17,7 @@ You can also customize the prompt to do other things - translate, summarize, cha
 
 ## Demo
 
-<!-- TODO: Add a GIF or short video showing how it works -->
-
-_Coming soon: A quick demo showing MyReviser in action_
+![MyReviser Demo](assets/demo.gif)
 
 ## How It Works
 
@@ -87,11 +85,10 @@ You can also add custom OpenAI-compatible providers (like local LLMs, OpenRouter
 
 Config files are created on first run:
 
-| Platform | Path                                                  |
-| -------- | ----------------------------------------------------- |
-| Linux    | `~/.config/myreviser/config.json`                     |
-| macOS    | `~/Library/Application Support/MyReviser/config.json` |
-| Windows  | `%USERPROFILE%\.myreviser\config.json`                |
+| Platform      | Path                                   |
+| ------------- | -------------------------------------- |
+| Linux / macOS | `~/.myreviser/config.json`             |
+| Windows       | `%USERPROFILE%\.myreviser\config.json` |
 
 ## Building From Source
 
