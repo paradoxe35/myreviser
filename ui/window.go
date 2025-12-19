@@ -63,7 +63,6 @@ type MainWindow struct {
 	// Custom provider UI components
 	providerSelect       *widget.Select
 	deleteProviderButton *widget.Button
-	providerTypeLabel    *widget.Label
 
 	// Platform-specific callbacks
 	onShowCallback func()
@@ -323,15 +322,11 @@ func (w *MainWindow) createProviderSelectionSection(selected string) fyne.Canvas
 	})
 	w.deleteProviderButton.Importance = widget.DangerImportance
 
-	w.providerTypeLabel = widget.NewLabel("")
-	w.providerTypeLabel.TextStyle.Italic = true
-
 	providerRow := container.NewBorder(nil, nil, nil, w.deleteProviderButton, w.providerSelect)
 
 	content := container.NewVBox(
 		providerLabel,
 		providerRow,
-		w.providerTypeLabel,
 	)
 
 	return content
@@ -702,7 +697,12 @@ func (w *MainWindow) testAPIConnection() {
 			fyne.Do(func() {
 				w.statusBinding.Set("Connection successful!")
 			})
-			logger.Info("API connection test successful")
+			logger.Info("API connection test successful",
+				"provider", provider,
+				"model", model,
+				"temperature", settings.Temperature,
+				"custom", isCustom,
+			)
 		}
 	}()
 }
@@ -891,14 +891,6 @@ func (w *MainWindow) updateProviderUI(provider string) {
 		}
 	}
 
-	if w.providerTypeLabel != nil {
-		if isCustom {
-			w.providerTypeLabel.SetText("Type: OpenAI Compatible")
-			w.providerTypeLabel.Show()
-		} else {
-			w.providerTypeLabel.Hide()
-		}
-	}
 }
 
 func (w *MainWindow) refreshProviderList() {
