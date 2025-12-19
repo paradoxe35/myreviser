@@ -364,11 +364,11 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	temp, _ := w.temperatureBinding.Get()
 	tempValue.SetText(fmt.Sprintf("%.1f", temp))
 
-	// Model and Temperature on same row
-	modelTempRow := container.NewGridWithColumns(2,
-		container.NewVBox(modelLabel, modelEntry),
-		container.NewVBox(container.NewHBox(tempLabel, tempValue), tempSlider),
-	)
+	// Model and Temperature on same row with proper spacing
+	modelTempRow := container.NewPadded(container.NewGridWithColumns(2,
+		container.NewBorder(nil, nil, modelLabel, nil, modelEntry),
+		container.NewBorder(nil, nil, tempLabel, tempValue, tempSlider),
+	))
 
 	// Base URL section (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL:")
@@ -378,8 +378,9 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	w.baseURLEntry.PlaceHolder = "https://api.openai.com/v1 (optional)"
 	w.baseURLEntry.Validator = nil // Disable validation icon
 
-	// Create Base URL container for visibility control
+	// Create Base URL container for visibility control (includes separator)
 	w.baseURLContainer = container.NewVBox(
+		widget.NewSeparator(),
 		baseURLLabel,
 		w.baseURLEntry,
 	)
@@ -390,7 +391,6 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 		apiKeyEntry,
 		widget.NewSeparator(),
 		modelTempRow,
-		widget.NewSeparator(),
 		w.baseURLContainer,
 	)
 
@@ -654,6 +654,7 @@ func (w *MainWindow) testAPIConnection() {
 		settings := w.config.GetProviderSettings(provider)
 		apiKey, _ := w.apiKeyBinding.Get()
 		model, _ := w.modelBinding.Get()
+		temperature, _ := w.temperatureBinding.Get()
 		baseURL, _ := w.baseURLBinding.Get()
 
 		if apiKey == "" {
@@ -673,7 +674,7 @@ func (w *MainWindow) testAPIConnection() {
 				})
 				return
 			}
-			customProvider, err := ai.NewCustomProvider(provider, settings.ProviderType, apiKey, baseURL, model, settings.Temperature)
+			customProvider, err := ai.NewCustomProvider(provider, settings.ProviderType, apiKey, baseURL, model, temperature)
 			if err != nil {
 				fyne.Do(func() {
 					w.statusBinding.Set(fmt.Sprintf("Error: %s", err.Error()))
@@ -684,11 +685,11 @@ func (w *MainWindow) testAPIConnection() {
 		} else {
 			switch provider {
 			case config.BuiltInOpenAI:
-				testProvider = ai.NewOpenAIProvider(apiKey, baseURL, model, settings.Temperature)
+				testProvider = ai.NewOpenAIProvider(apiKey, baseURL, model, temperature)
 			case config.BuiltInClaude:
-				testProvider = ai.NewAnthropicProvider(apiKey, baseURL, model, settings.Temperature)
+				testProvider = ai.NewAnthropicProvider(apiKey, baseURL, model, temperature)
 			case config.BuiltInGemini:
-				testProvider = ai.NewGeminiProvider(apiKey, baseURL, model, settings.Temperature)
+				testProvider = ai.NewGeminiProvider(apiKey, baseURL, model, temperature)
 			default:
 				fyne.Do(func() {
 					w.statusBinding.Set("Error: Unknown provider")
