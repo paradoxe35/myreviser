@@ -46,6 +46,7 @@ type MainWindow struct {
 	providerBinding        binding.String
 	apiKeyBinding          binding.String
 	modelBinding           binding.String
+	temperatureBinding     binding.Float
 	baseURLBinding         binding.String
 	hotkeySelectBinding    binding.String
 	hotkeySelectionBinding binding.String
@@ -121,6 +122,7 @@ func (w *MainWindow) initBindings() {
 	w.providerBinding = binding.NewString()
 	w.apiKeyBinding = binding.NewString()
 	w.modelBinding = binding.NewString()
+	w.temperatureBinding = binding.NewFloat()
 	w.baseURLBinding = binding.NewString()
 	w.hotkeySelectBinding = binding.NewString()
 	w.hotkeySelectionBinding = binding.NewString()
@@ -213,6 +215,7 @@ func (w *MainWindow) loadProviderSettings(provider string) {
 	apiKey, _ := w.config.GetAPIKey(provider)
 	w.apiKeyBinding.Set(apiKey)
 	w.modelBinding.Set(settings.Model)
+	w.temperatureBinding.Set(settings.Temperature)
 
 	isCustom := w.config.IsCustomProvider(provider)
 	if isCustom {
@@ -343,11 +346,29 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 
 	// Model section
 	modelLabel := widget.NewLabel("Model:")
-	modelLabel.TextStyle.Bold = true
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
-	modelEntry.PlaceHolder = "e.g., gpt-4o (optional)"
+	modelEntry.PlaceHolder = "e.g., gpt-4o"
 	modelEntry.Validator = nil // Disable validation icon
+
+	// Temperature section
+	tempLabel := widget.NewLabel("Temp:")
+	tempValue := widget.NewLabel("1.0")
+	tempSlider := widget.NewSlider(0, 2)
+	tempSlider.Step = 0.1
+	tempSlider.Bind(w.temperatureBinding)
+	tempSlider.OnChanged = func(value float64) {
+		tempValue.SetText(fmt.Sprintf("%.1f", value))
+	}
+	// Initialize display from binding
+	temp, _ := w.temperatureBinding.Get()
+	tempValue.SetText(fmt.Sprintf("%.1f", temp))
+
+	// Model and Temperature on same row
+	modelTempRow := container.NewGridWithColumns(2,
+		container.NewBorder(nil, nil, modelLabel, nil, modelEntry),
+		container.NewBorder(nil, nil, tempLabel, tempValue, tempSlider),
+	)
 
 	// Base URL section (for custom endpoints - only for OpenAI)
 	baseURLLabel := widget.NewLabel("Base URL:")
@@ -368,8 +389,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 		apiKeyLabel,
 		apiKeyEntry,
 		widget.NewSeparator(),
-		modelLabel,
-		modelEntry,
+		modelTempRow,
 		widget.NewSeparator(),
 		w.baseURLContainer,
 	)
@@ -722,6 +742,7 @@ func (w *MainWindow) saveSettings() {
 	provider, _ := w.providerBinding.Get()
 	apiKey, _ := w.apiKeyBinding.Get()
 	model, _ := w.modelBinding.Get()
+	temperature, _ := w.temperatureBinding.Get()
 	hotkeySelect, _ := w.hotkeySelectBinding.Get()
 	hotkeySelection, _ := w.hotkeySelectionBinding.Get()
 	prompt, _ := w.promptBinding.Get()
@@ -747,7 +768,7 @@ func (w *MainWindow) saveSettings() {
 
 	settings := config.ProviderSettings{
 		Model:        model,
-		Temperature:  existingSettings.Temperature,
+		Temperature:  temperature,
 		IsCustom:     existingSettings.IsCustom,
 		ProviderType: existingSettings.ProviderType,
 	}
