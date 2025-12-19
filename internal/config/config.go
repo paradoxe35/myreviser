@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/paradoxe35/myreviser/internal/utils"
@@ -49,9 +50,10 @@ type HotkeyConfig struct {
 }
 
 type RevisionConfig struct {
-	CharacterLimit int    `json:"character_limit"`
-	SystemPrompt   string `json:"system_prompt"`
-	TimeoutSeconds int    `json:"timeout_seconds"`
+	CharacterLimit         int    `json:"character_limit"`
+	SystemPrompt           string `json:"system_prompt"`
+	TimeoutSeconds         int    `json:"timeout_seconds"`
+	EnableProviderMentions bool   `json:"enable_provider_mentions"`
 }
 
 type AppearanceConfig struct {
@@ -136,7 +138,8 @@ func GetDefaultRevision() RevisionConfig {
 		SystemPrompt: "You are a multilingual text enhancer: fix errors, improve clarity and quality " +
 			"while preserving tone, context, and intent in the original language. " +
 			"Return only the enhanced version without additional text.",
-		TimeoutSeconds: 30,
+		TimeoutSeconds:         30,
+		EnableProviderMentions: true,
 	}
 }
 
@@ -337,8 +340,9 @@ func BuiltInProviders() []string {
 }
 
 func IsBuiltInProvider(name string) bool {
+	nameLower := strings.ToLower(name)
 	for _, p := range BuiltInProviders() {
-		if p == name {
+		if strings.ToLower(p) == nameLower {
 			return true
 		}
 	}
@@ -380,8 +384,11 @@ func (c *Config) AddCustomProvider(name string, settings ProviderSettings) error
 		c.AIProvider.Providers = make(map[string]ProviderSettings)
 	}
 
-	if _, exists := c.AIProvider.Providers[name]; exists {
-		return fmt.Errorf("provider with name '%s' already exists", name)
+	nameLower := strings.ToLower(name)
+	for existingName := range c.AIProvider.Providers {
+		if strings.ToLower(existingName) == nameLower {
+			return fmt.Errorf("provider with name '%s' already exists", existingName)
+		}
 	}
 
 	settings.IsCustom = true

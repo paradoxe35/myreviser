@@ -504,8 +504,23 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	timeoutValue := widget.NewLabel(fmt.Sprintf("%ds", w.config.Revision.TimeoutSeconds))
 	timeoutSlider.OnChanged = func(value float64) {
 		timeoutValue.SetText(fmt.Sprintf("%ds", int(value)))
+	}
+	timeoutSlider.OnChangeEnded = func(value float64) {
 		w.config.Revision.TimeoutSeconds = int(value)
 	}
+
+	// Provider Mentions toggle
+	providerMentionsLabel := widget.NewLabel("Provider Mentions:")
+	providerMentionsLabel.TextStyle.Bold = true
+	providerMentionsCheck := widget.NewCheck("Enable @provider mentions", func(enabled bool) {
+		w.config.Revision.EnableProviderMentions = enabled
+	})
+	providerMentionsCheck.SetChecked(w.config.Revision.EnableProviderMentions)
+
+	providerMentionsHelp := widget.NewLabel(
+		"When enabled, prefix text with @provider to switch AI (e.g., @claude)")
+	providerMentionsHelp.Wrapping = fyne.TextWrapWord
+	providerMentionsHelp.TextStyle = fyne.TextStyle{Italic: true}
 
 	// Reset prompt button
 	resetPromptBtn := widget.NewButton("Reset to Default Prompt", func() {
@@ -518,6 +533,10 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 		widget.NewSeparator(),
 		container.NewPadded(container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry)),
 		container.NewPadded(container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider)),
+		widget.NewSeparator(),
+		container.NewPadded(providerMentionsLabel),
+		container.NewPadded(providerMentionsCheck),
+		container.NewPadded(providerMentionsHelp),
 		widget.NewSeparator(),
 		container.NewPadded(resetPromptBtn),
 	)
@@ -620,7 +639,9 @@ func (w *MainWindow) testAPIConnection() {
 		baseURL, _ := w.baseURLBinding.Get()
 
 		if apiKey == "" {
-			w.statusBinding.Set("Error: API key is required")
+			fyne.Do(func() {
+				w.statusBinding.Set("Error: API key is required")
+			})
 			return
 		}
 
@@ -629,12 +650,16 @@ func (w *MainWindow) testAPIConnection() {
 
 		if isCustom {
 			if baseURL == "" {
-				w.statusBinding.Set("Error: Base URL is required for custom providers")
+				fyne.Do(func() {
+					w.statusBinding.Set("Error: Base URL is required for custom providers")
+				})
 				return
 			}
 			customProvider, err := ai.NewCustomProvider(provider, settings.ProviderType, apiKey, baseURL, model, settings.Temperature)
 			if err != nil {
-				w.statusBinding.Set(fmt.Sprintf("Error: %s", err.Error()))
+				fyne.Do(func() {
+					w.statusBinding.Set(fmt.Sprintf("Error: %s", err.Error()))
+				})
 				return
 			}
 			testProvider = customProvider
@@ -647,7 +672,9 @@ func (w *MainWindow) testAPIConnection() {
 			case config.BuiltInGemini:
 				testProvider = ai.NewGeminiProvider(apiKey, baseURL, model, settings.Temperature)
 			default:
-				w.statusBinding.Set("Error: Unknown provider")
+				fyne.Do(func() {
+					w.statusBinding.Set("Error: Unknown provider")
+				})
 				return
 			}
 		}
@@ -664,10 +691,14 @@ func (w *MainWindow) testAPIConnection() {
 			if len(errMsg) > 80 {
 				errMsg = errMsg[:77] + "..."
 			}
-			w.statusBinding.Set(fmt.Sprintf("Connection failed: %s", errMsg))
+			fyne.Do(func() {
+				w.statusBinding.Set(fmt.Sprintf("Connection failed: %s", errMsg))
+			})
 			logger.Error("API connection test failed", "error", err)
 		} else {
-			w.statusBinding.Set("Connection successful!")
+			fyne.Do(func() {
+				w.statusBinding.Set("Connection successful!")
+			})
 			logger.Info("API connection test successful")
 		}
 	}()
@@ -814,10 +845,8 @@ func (w *MainWindow) restartApplication() {
 	logger.Info("User requested application restart")
 
 	go func() {
-		// Small delay to let UI update
 		time.Sleep(200 * time.Millisecond)
 
-		// Use platform-specific restart logic
 		err := platform.RestartApplication()
 		if err != nil {
 			logger.Error("Failed to restart application", "error", err)
@@ -826,8 +855,9 @@ func (w *MainWindow) restartApplication() {
 
 		logger.Info("New instance started, quitting current instance")
 
-		// Quit current instance after new one starts
-		w.app.Quit()
+		fyne.Do(func() {
+			w.app.Quit()
+		})
 	}()
 }
 
