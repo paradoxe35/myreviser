@@ -69,6 +69,8 @@ func ShowToast(window fyne.Window, message string, severity widget.Importance) {
 	// Auto-hide after 3 seconds
 	go func() {
 		<-time.After(3 * time.Second)
-		popup.Hide()
+		fyne.Do(func() {
+			popup.Hide()
+		})
 	}()
 }

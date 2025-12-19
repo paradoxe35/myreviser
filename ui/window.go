@@ -63,7 +63,6 @@ type MainWindow struct {
 	// Custom provider UI components
 	providerSelect       *widget.Select
 	deleteProviderButton *widget.Button
-	providerTypeLabel    *widget.Label
 
 	// Platform-specific callbacks
 	onShowCallback func()
@@ -249,6 +248,17 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 		container.NewTabItemWithIcon("System", theme.ViewFullScreenIcon(), systemSection),
 	)
 
+	// Fix for AppTabs layout width issue on Windows
+	// See: https://github.com/fyne-io/fyne/issues/5338
+	tabs.OnSelected = func(tab *container.TabItem) {
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			fyne.Do(func() {
+				tab.Content.Refresh()
+			})
+		}()
+	}
+
 	// Save button
 	saveBtn := widget.NewButtonWithIcon("Save Settings", theme.DocumentSaveIcon(), w.saveSettings)
 	saveBtn.Importance = widget.HighImportance
@@ -312,15 +322,11 @@ func (w *MainWindow) createProviderSelectionSection(selected string) fyne.Canvas
 	})
 	w.deleteProviderButton.Importance = widget.DangerImportance
 
-	w.providerTypeLabel = widget.NewLabel("")
-	w.providerTypeLabel.TextStyle.Italic = true
-
 	providerRow := container.NewBorder(nil, nil, nil, w.deleteProviderButton, w.providerSelect)
 
 	content := container.NewVBox(
 		providerLabel,
 		providerRow,
-		w.providerTypeLabel,
 	)
 
 	return content
@@ -340,7 +346,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 	modelLabel.TextStyle.Bold = true
 	modelEntry := widget.NewEntry()
 	modelEntry.Bind(w.modelBinding)
-	modelEntry.PlaceHolder = "e.g., gpt-4o (optional)"
+	modelEntry.PlaceHolder = "e.g., gpt-4o"
 	modelEntry.Validator = nil // Disable validation icon
 
 	// Base URL section (for custom endpoints - only for OpenAI)
@@ -353,6 +359,7 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 
 	// Create Base URL container for visibility control
 	w.baseURLContainer = container.NewVBox(
+		widget.NewSeparator(),
 		baseURLLabel,
 		w.baseURLEntry,
 	)
@@ -364,7 +371,6 @@ func (w *MainWindow) createProviderConfigSection() fyne.CanvasObject {
 		widget.NewSeparator(),
 		modelLabel,
 		modelEntry,
-		widget.NewSeparator(),
 		w.baseURLContainer,
 	)
 
@@ -429,21 +435,16 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	selectAllCapture.SetSiblings(selectionCapture)
 	selectionCapture.SetSiblings(selectAllCapture)
 
-	// Hotkey instructions
-	instructionsLabel := widget.NewLabel("1. Click the 'Capture' button\n" +
-		"2. Press keys ONE AT A TIME to build combination\n" +
-		"   (e.g., press Ctrl, then Alt, then Space)\n" +
-		"3. Press Enter or click 'Save' to save\n" +
-		"4. Press ESC to cancel without saving\n\n" +
-		"Requirements:\n" +
-		"• At least one modifier (Ctrl, Alt, Shift, Super/Win/Cmd)\n" +
-		"• At least one regular key\n" +
-		"• Each hotkey must be unique\n" +
-		"• Maximum 3 regular keys per combination\n\n" +
-		"Note: Only one hotkey can be captured at a time.\n" +
-		"Global hotkeys are disabled during capture.")
+	// Hotkey instructions - collapsible accordion
+	instructionsLabel := widget.NewLabel(
+		"• Click 'Capture', press keys one at a time, then Enter to save\n" +
+			"• Requires at least one modifier (Ctrl/Alt/Shift/Super)\n" +
+			"• Press ESC to cancel")
 	instructionsLabel.Wrapping = fyne.TextWrapWord
-	instructions := widget.NewCard("", "How to Capture Hotkeys", instructionsLabel)
+
+	instructions := widget.NewAccordion(
+		widget.NewAccordionItem("How to Capture Hotkeys", instructionsLabel),
+	)
 
 	// Reset to defaults button
 	resetBtn := widget.NewButton("Reset to Defaults", func() {
@@ -462,14 +463,11 @@ func (w *MainWindow) createHotkeySection() fyne.CanvasObject {
 	})
 
 	form := container.NewVBox(
-		container.NewPadded(selectAllLabel),
-		container.NewPadded(selectAllCapture),
+		container.NewPadded(container.NewVBox(selectAllLabel, selectAllCapture)),
 		widget.NewSeparator(),
-		container.NewPadded(selectionLabel),
-		container.NewPadded(selectionCapture),
+		container.NewPadded(container.NewVBox(selectionLabel, selectionCapture)),
 		widget.NewSeparator(),
-		container.NewPadded(instructions),
-		container.NewPadded(resetBtn),
+		container.NewPadded(container.NewVBox(instructions, resetBtn)),
 	)
 
 	return container.NewScroll(form)
@@ -504,8 +502,23 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	timeoutValue := widget.NewLabel(fmt.Sprintf("%ds", w.config.Revision.TimeoutSeconds))
 	timeoutSlider.OnChanged = func(value float64) {
 		timeoutValue.SetText(fmt.Sprintf("%ds", int(value)))
+	}
+	timeoutSlider.OnChangeEnded = func(value float64) {
 		w.config.Revision.TimeoutSeconds = int(value)
 	}
+
+	// Provider Mentions toggle
+	providerMentionsLabel := widget.NewLabel("Provider Mentions:")
+	providerMentionsLabel.TextStyle.Bold = true
+	providerMentionsCheck := widget.NewCheck("Enable @provider mentions", func(enabled bool) {
+		w.config.Revision.EnableProviderMentions = enabled
+	})
+	providerMentionsCheck.SetChecked(w.config.Revision.EnableProviderMentions)
+
+	providerMentionsHelp := widget.NewLabel(
+		"Add @provider before text to revise with that AI (e.g., @claude Fix this)")
+	providerMentionsHelp.Wrapping = fyne.TextWrapWord
+	providerMentionsHelp.TextStyle = fyne.TextStyle{Italic: true}
 
 	// Reset prompt button
 	resetPromptBtn := widget.NewButton("Reset to Default Prompt", func() {
@@ -513,11 +526,18 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	})
 
 	form := container.NewVBox(
-		container.NewPadded(promptLabel),
-		container.NewPadded(promptEntry),
+		container.NewPadded(container.NewVBox(promptLabel, promptEntry)),
 		widget.NewSeparator(),
-		container.NewPadded(container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry)),
-		container.NewPadded(container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider)),
+		container.NewPadded(container.NewVBox(
+			container.NewBorder(nil, nil, charLimitLabel, nil, charLimitEntry),
+			container.NewBorder(nil, nil, timeoutLabel, timeoutValue, timeoutSlider),
+		)),
+		widget.NewSeparator(),
+		container.NewPadded(container.NewVBox(
+			providerMentionsLabel,
+			providerMentionsCheck,
+			providerMentionsHelp,
+		)),
 		widget.NewSeparator(),
 		container.NewPadded(resetPromptBtn),
 	)
@@ -573,12 +593,9 @@ func (w *MainWindow) createSystemSection() fyne.CanvasObject {
 	}
 
 	formItems := []fyne.CanvasObject{
-		container.NewPadded(themeLabel),
-		container.NewPadded(themeSelect),
-		container.NewPadded(themeDesc),
+		container.NewPadded(container.NewVBox(themeLabel, themeSelect, themeDesc)),
 		widget.NewSeparator(),
-		container.NewPadded(startMinimizedCheck),
-		container.NewPadded(startOnLoginCheck),
+		container.NewPadded(container.NewVBox(startMinimizedCheck, startOnLoginCheck)),
 	}
 
 	// Add version if production build
@@ -620,7 +637,9 @@ func (w *MainWindow) testAPIConnection() {
 		baseURL, _ := w.baseURLBinding.Get()
 
 		if apiKey == "" {
-			w.statusBinding.Set("Error: API key is required")
+			fyne.Do(func() {
+				w.statusBinding.Set("Error: API key is required")
+			})
 			return
 		}
 
@@ -629,12 +648,16 @@ func (w *MainWindow) testAPIConnection() {
 
 		if isCustom {
 			if baseURL == "" {
-				w.statusBinding.Set("Error: Base URL is required for custom providers")
+				fyne.Do(func() {
+					w.statusBinding.Set("Error: Base URL is required for custom providers")
+				})
 				return
 			}
 			customProvider, err := ai.NewCustomProvider(provider, settings.ProviderType, apiKey, baseURL, model, settings.Temperature)
 			if err != nil {
-				w.statusBinding.Set(fmt.Sprintf("Error: %s", err.Error()))
+				fyne.Do(func() {
+					w.statusBinding.Set(fmt.Sprintf("Error: %s", err.Error()))
+				})
 				return
 			}
 			testProvider = customProvider
@@ -647,7 +670,9 @@ func (w *MainWindow) testAPIConnection() {
 			case config.BuiltInGemini:
 				testProvider = ai.NewGeminiProvider(apiKey, baseURL, model, settings.Temperature)
 			default:
-				w.statusBinding.Set("Error: Unknown provider")
+				fyne.Do(func() {
+					w.statusBinding.Set("Error: Unknown provider")
+				})
 				return
 			}
 		}
@@ -664,11 +689,20 @@ func (w *MainWindow) testAPIConnection() {
 			if len(errMsg) > 80 {
 				errMsg = errMsg[:77] + "..."
 			}
-			w.statusBinding.Set(fmt.Sprintf("Connection failed: %s", errMsg))
+			fyne.Do(func() {
+				w.statusBinding.Set(fmt.Sprintf("Connection failed: %s", errMsg))
+			})
 			logger.Error("API connection test failed", "error", err)
 		} else {
-			w.statusBinding.Set("Connection successful!")
-			logger.Info("API connection test successful")
+			fyne.Do(func() {
+				w.statusBinding.Set("Connection successful!")
+			})
+			logger.Info("API connection test successful",
+				"provider", provider,
+				"model", model,
+				"temperature", settings.Temperature,
+				"custom", isCustom,
+			)
 		}
 	}()
 }
@@ -771,6 +805,11 @@ func (w *MainWindow) ShowWindow() {
 	}
 	w.Show()
 	w.RequestFocus()
+
+	// Force layout refresh after show to fix Windows minimize/restore sizing issue
+	// See: https://github.com/fyne-io/fyne/issues/300
+	w.Resize(w.Canvas().Size())
+	w.Content().Refresh()
 }
 
 // HideWindow hides the window and handles platform-specific behavior (e.g., macOS Dock)
@@ -814,10 +853,8 @@ func (w *MainWindow) restartApplication() {
 	logger.Info("User requested application restart")
 
 	go func() {
-		// Small delay to let UI update
 		time.Sleep(200 * time.Millisecond)
 
-		// Use platform-specific restart logic
 		err := platform.RestartApplication()
 		if err != nil {
 			logger.Error("Failed to restart application", "error", err)
@@ -826,8 +863,9 @@ func (w *MainWindow) restartApplication() {
 
 		logger.Info("New instance started, quitting current instance")
 
-		// Quit current instance after new one starts
-		w.app.Quit()
+		fyne.Do(func() {
+			w.app.Quit()
+		})
 	}()
 }
 
@@ -853,14 +891,6 @@ func (w *MainWindow) updateProviderUI(provider string) {
 		}
 	}
 
-	if w.providerTypeLabel != nil {
-		if isCustom {
-			w.providerTypeLabel.SetText("Type: OpenAI Compatible")
-			w.providerTypeLabel.Show()
-		} else {
-			w.providerTypeLabel.Hide()
-		}
-	}
 }
 
 func (w *MainWindow) refreshProviderList() {
@@ -886,11 +916,12 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 	modelEntry := widget.NewEntry()
 	modelEntry.PlaceHolder = "e.g., gpt-4 or llama3"
 
-	statusLabel := widget.NewLabel("")
-	statusLabel.Wrapping = fyne.TextWrapWord
+	errorLabel := widget.NewLabel("")
+	errorLabel.Wrapping = fyne.TextWrapWord
+	errorLabel.Importance = widget.DangerImportance
 
 	fetchModelsBtn := widget.NewButton("Fetch Models", func() {
-		w.fetchModelsForCustomProvider(apiKeyEntry.Text, baseURLEntry.Text, modelEntry, statusLabel)
+		w.fetchModelsForCustomProvider(apiKeyEntry.Text, baseURLEntry.Text, modelEntry, errorLabel)
 	})
 
 	form := container.NewVBox(
@@ -905,68 +936,74 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 		widget.NewSeparator(),
 		widget.NewLabel("Model:"),
 		container.NewBorder(nil, nil, nil, fetchModelsBtn, modelEntry),
-		statusLabel,
+		errorLabel,
 	)
 
 	scrollContainer := container.NewScroll(form)
 	scrollContainer.SetMinSize(fyne.NewSize(400, 350))
 
-	d := dialog.NewCustomConfirm(
-		"Add Custom Provider",
-		"Add",
-		"Cancel",
-		scrollContainer,
-		func(confirmed bool) {
-			if !confirmed {
+	var d dialog.Dialog
+
+	addBtn := widget.NewButton("Add", func() {
+		// Clear previous error
+		errorLabel.SetText("")
+
+		name := strings.TrimSpace(nameEntry.Text)
+		if name == "" {
+			errorLabel.SetText("Provider name is required")
+			return
+		}
+
+		baseURL := strings.TrimSpace(baseURLEntry.Text)
+		if baseURL == "" {
+			errorLabel.SetText("Base URL is required")
+			return
+		}
+
+		settings := config.ProviderSettings{
+			BaseURL:      baseURL,
+			Model:        strings.TrimSpace(modelEntry.Text),
+			Temperature:  1.0,
+			IsCustom:     true,
+			ProviderType: config.ProviderTypeOpenAICompatible,
+		}
+
+		if err := w.config.AddCustomProvider(name, settings); err != nil {
+			errorLabel.SetText(err.Error())
+			return
+		}
+
+		if apiKey := strings.TrimSpace(apiKeyEntry.Text); apiKey != "" {
+			if err := w.config.SaveAPIKey(name, apiKey); err != nil {
+				errorLabel.SetText(fmt.Sprintf("Error saving API key: %s", err.Error()))
 				return
 			}
+		}
 
-			name := strings.TrimSpace(nameEntry.Text)
-			if name == "" {
-				w.statusBinding.Set("Error: Provider name is required")
-				return
-			}
+		if err := w.config.Save(); err != nil {
+			errorLabel.SetText(fmt.Sprintf("Error saving: %s", err.Error()))
+			return
+		}
 
-			baseURL := strings.TrimSpace(baseURLEntry.Text)
-			if baseURL == "" {
-				w.statusBinding.Set("Error: Base URL is required for custom providers")
-				return
-			}
+		// Success - close dialog and update UI
+		d.Hide()
+		w.refreshProviderList()
+		w.providerSelect.SetSelected(name)
+		w.providerBinding.Set(name)
+		w.loadProviderSettings(name)
+		w.statusBinding.Set(fmt.Sprintf("Custom provider '%s' added", name))
+	})
+	addBtn.Importance = widget.HighImportance
 
-			settings := config.ProviderSettings{
-				BaseURL:      baseURL,
-				Model:        strings.TrimSpace(modelEntry.Text),
-				Temperature:  1.0,
-				IsCustom:     true,
-				ProviderType: config.ProviderTypeOpenAICompatible,
-			}
+	cancelBtn := widget.NewButton("Cancel", func() {
+		d.Hide()
+	})
 
-			if err := w.config.AddCustomProvider(name, settings); err != nil {
-				w.statusBinding.Set(fmt.Sprintf("Error: %s", err.Error()))
-				return
-			}
+	buttons := container.NewHBox(cancelBtn, addBtn)
+	content := container.NewBorder(nil, buttons, nil, nil, scrollContainer)
 
-			if apiKey := strings.TrimSpace(apiKeyEntry.Text); apiKey != "" {
-				if err := w.config.SaveAPIKey(name, apiKey); err != nil {
-					w.statusBinding.Set(fmt.Sprintf("Error saving API key: %s", err.Error()))
-					return
-				}
-			}
-
-			if err := w.config.Save(); err != nil {
-				w.statusBinding.Set(fmt.Sprintf("Error saving config: %s", err.Error()))
-				return
-			}
-
-			w.refreshProviderList()
-			w.providerSelect.SetSelected(name)
-			w.providerBinding.Set(name)
-			w.loadProviderSettings(name)
-			w.statusBinding.Set(fmt.Sprintf("Custom provider '%s' added successfully", name))
-		},
-		w.Window,
-	)
-	d.Resize(fyne.NewSize(450, 450))
+	d = dialog.NewCustomWithoutButtons("Add Custom Provider", content, w.Window)
+	d.Resize(fyne.NewSize(450, 480))
 	d.Show()
 }
 

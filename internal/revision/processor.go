@@ -248,21 +248,43 @@ func (p *Processor) reviseText(text string) (string, error) {
 	cfg := p.config
 	p.mu.Unlock()
 
-	trimmedText := strings.TrimSpace(text)
+	mentionedProvider, cleanedText, hasMention := p.parseProviderMention(text)
+
+	textToRevise := text
+	if hasMention && mentionedProvider != "" {
+		textToRevise = cleanedText
+	}
+
+	trimmedText := strings.TrimSpace(textToRevise)
 	if trimmedText == "" {
 		return "", fmt.Errorf("text is empty or contains only whitespace")
 	}
 
-	if len(text) > cfg.Revision.CharacterLimit {
+	if len(textToRevise) > cfg.Revision.CharacterLimit {
 		return "", fmt.Errorf("text exceeds character limit (%d > %d)",
-			len(text), cfg.Revision.CharacterLimit)
+			len(textToRevise), cfg.Revision.CharacterLimit)
 	}
 
 	if len(trimmedText) < 1 {
 		return "", fmt.Errorf("text too short to revise")
 	}
 
-	provider := p.providerFactory.GetCurrent()
+	var provider ai.Provider
+	if hasMention && mentionedProvider != "" {
+		var err error
+		provider, err = p.getOrCreateProvider(mentionedProvider)
+		if err != nil {
+			logger.Warn("Failed to use mentioned provider, using default",
+				"mentioned", mentionedProvider, "error", err)
+			provider = p.providerFactory.GetCurrent()
+			textToRevise = text
+		} else {
+			logger.Info("Using mentioned provider", "provider", mentionedProvider)
+		}
+	} else {
+		provider = p.providerFactory.GetCurrent()
+	}
+
 	if provider == nil {
 		return "", fmt.Errorf("no AI provider configured - please configure your API key in Settings")
 	}
@@ -275,11 +297,11 @@ func (p *Processor) reviseText(text string) (string, error) {
 		"provider", provider.GetName(),
 		"model", provider.GetModel(),
 		"temperature", provider.GetTemperature(),
-		"text", text,
-		"text_length", len(text),
+		"text", textToRevise,
+		"text_length", len(textToRevise),
 	)
 
-	revised, err := provider.ReviseText(ctx, text, p.config.Revision.SystemPrompt)
+	revised, err := provider.ReviseText(ctx, textToRevise, p.config.Revision.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("AI revision failed: %w", err)
 	}
@@ -291,7 +313,7 @@ func (p *Processor) reviseText(text string) (string, error) {
 
 	logger.Info("Text revised successfully",
 		"revised", revised,
-		"original_length", len(text),
+		"original_length", len(textToRevise),
 		"revised_length", len(revised),
 	)
 
@@ -319,4 +341,91 @@ func (p *Processor) Close() {
 	if p.clipboardManager != nil {
 		p.clipboardManager.Close()
 	}
+}
+
+func (p *Processor) parseProviderMention(text string) (string, string, bool) {
+	p.mu.Lock()
+	cfg := p.config
+	p.mu.Unlock()
+
+	if !cfg.Revision.EnableProviderMentions {
+		return "", text, false
+	}
+
+	trimmedText := strings.TrimSpace(text)
+	if !strings.HasPrefix(trimmedText, "@") {
+		return "", text, false
+	}
+
+	parts := strings.SplitN(trimmedText, " ", 2)
+	if len(parts) == 0 {
+		return "", text, false
+	}
+
+	providerName := strings.ToLower(strings.TrimPrefix(parts[0], "@"))
+
+	if !p.isValidProvider(providerName) {
+		return "", text, false
+	}
+
+	cleanedText := ""
+	if len(parts) > 1 {
+		cleanedText = strings.TrimSpace(parts[1])
+	}
+
+	return providerName, cleanedText, true
+}
+
+func (p *Processor) isValidProvider(name string) bool {
+	p.mu.Lock()
+	cfg := p.config
+	p.mu.Unlock()
+
+	if cfg.AIProvider.Providers == nil {
+		return false
+	}
+
+	_, exists := cfg.AIProvider.Providers[name]
+	return exists
+}
+
+func (p *Processor) getOrCreateProvider(name string) (ai.Provider, error) {
+	if provider, err := p.providerFactory.Get(name); err == nil {
+		return provider, nil
+	}
+
+	p.mu.Lock()
+	cfg := p.config
+	p.mu.Unlock()
+
+	apiKey, err := cfg.GetAPIKey(name)
+	if err != nil || apiKey == "" {
+		return nil, fmt.Errorf("no API key configured for %s", name)
+	}
+
+	settings := cfg.GetProviderSettings(name)
+
+	var provider ai.Provider
+
+	if settings.IsCustom {
+		customProvider, err := ai.NewCustomProvider(name, settings.ProviderType, apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		if err != nil {
+			return nil, err
+		}
+		provider = customProvider
+	} else {
+		switch name {
+		case config.BuiltInOpenAI:
+			provider = ai.NewOpenAIProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		case config.BuiltInClaude:
+			provider = ai.NewAnthropicProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		case config.BuiltInGemini:
+			provider = ai.NewGeminiProvider(apiKey, settings.BaseURL, settings.Model, settings.Temperature)
+		default:
+			return nil, fmt.Errorf("unknown provider: %s", name)
+		}
+	}
+
+	p.providerFactory.Register(name, provider)
+	return provider, nil
 }
