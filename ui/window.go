@@ -249,6 +249,17 @@ func (w *MainWindow) createContent() fyne.CanvasObject {
 		container.NewTabItemWithIcon("System", theme.ViewFullScreenIcon(), systemSection),
 	)
 
+	// Fix for AppTabs layout width issue on Windows
+	// See: https://github.com/fyne-io/fyne/issues/5338
+	tabs.OnSelected = func(tab *container.TabItem) {
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			fyne.Do(func() {
+				tab.Content.Refresh()
+			})
+		}()
+	}
+
 	// Save button
 	saveBtn := widget.NewButtonWithIcon("Save Settings", theme.DocumentSaveIcon(), w.saveSettings)
 	saveBtn.Importance = widget.HighImportance
@@ -510,7 +521,7 @@ func (w *MainWindow) createRevisionSection() fyne.CanvasObject {
 	providerMentionsCheck.SetChecked(w.config.Revision.EnableProviderMentions)
 
 	providerMentionsHelp := widget.NewLabel(
-		"When enabled, prefix text with @provider to switch AI (e.g., @claude)")
+		"Add @provider before text to revise with that AI (e.g., @claude Fix this)")
 	providerMentionsHelp.Wrapping = fyne.TextWrapWord
 	providerMentionsHelp.TextStyle = fyne.TextStyle{Italic: true}
 
@@ -794,6 +805,11 @@ func (w *MainWindow) ShowWindow() {
 	}
 	w.Show()
 	w.RequestFocus()
+
+	// Force layout refresh after show to fix Windows minimize/restore sizing issue
+	// See: https://github.com/fyne-io/fyne/issues/300
+	w.Resize(w.Canvas().Size())
+	w.Content().Refresh()
 }
 
 // HideWindow hides the window and handles platform-specific behavior (e.g., macOS Dock)
