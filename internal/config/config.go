@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/paradoxe35/myreviser/internal/utils"
 )
@@ -369,12 +370,27 @@ func (c *Config) GetAllProviderNames() []string {
 	return names
 }
 
-func (c *Config) AddCustomProvider(name string, settings ProviderSettings) error {
-	if IsBuiltInProvider(name) {
-		return fmt.Errorf("cannot use built-in provider name: %s", name)
+func isValidProviderName(name string) bool {
+	if name == "" {
+		return false
 	}
+	for _, r := range name {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Config) AddCustomProvider(name string, settings ProviderSettings) error {
 	if name == "" {
 		return fmt.Errorf("provider name cannot be empty")
+	}
+	if !isValidProviderName(name) {
+		return fmt.Errorf("provider name can only contain letters, numbers, hyphens, and underscores")
+	}
+	if IsBuiltInProvider(name) {
+		return fmt.Errorf("cannot use built-in provider name: %s", name)
 	}
 
 	c.mu.Lock()
