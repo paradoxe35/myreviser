@@ -362,9 +362,11 @@ func (p *Processor) parseProviderMention(text string) (string, string, bool) {
 		return "", text, false
 	}
 
-	providerName := strings.ToLower(strings.TrimPrefix(parts[0], "@"))
+	mentionedName := strings.TrimPrefix(parts[0], "@")
 
-	if !p.isValidProvider(providerName) {
+	// Case-insensitive lookup returns the actual stored provider name
+	actualProviderName, found := p.findProviderByName(mentionedName)
+	if !found {
 		return "", text, false
 	}
 
@@ -373,20 +375,26 @@ func (p *Processor) parseProviderMention(text string) (string, string, bool) {
 		cleanedText = strings.TrimSpace(parts[1])
 	}
 
-	return providerName, cleanedText, true
+	return actualProviderName, cleanedText, true
 }
 
-func (p *Processor) isValidProvider(name string) bool {
+// findProviderByName does a case-insensitive lookup and returns the actual stored provider name
+func (p *Processor) findProviderByName(name string) (string, bool) {
 	p.mu.Lock()
 	cfg := p.config
 	p.mu.Unlock()
 
 	if cfg.AIProvider.Providers == nil {
-		return false
+		return "", false
 	}
 
-	_, exists := cfg.AIProvider.Providers[name]
-	return exists
+	nameLower := strings.ToLower(name)
+	for storedName := range cfg.AIProvider.Providers {
+		if strings.ToLower(storedName) == nameLower {
+			return storedName, true
+		}
+	}
+	return "", false
 }
 
 func (p *Processor) getOrCreateProvider(name string) (ai.Provider, error) {
