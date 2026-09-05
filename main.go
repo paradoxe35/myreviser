@@ -12,6 +12,7 @@ import (
 	singleinstance "github.com/allan-simon/go-singleinstance"
 	"github.com/paradoxe35/myreviser/internal/config"
 	"github.com/paradoxe35/myreviser/internal/logger"
+	"github.com/paradoxe35/myreviser/internal/platform"
 	"github.com/paradoxe35/myreviser/internal/utils"
 	"github.com/paradoxe35/myreviser/internal/version"
 	"github.com/paradoxe35/myreviser/ui"
@@ -28,12 +29,20 @@ func main() {
 
 	// Check for single instance
 	lockPath := utils.AppHomeDir("myreviser.lock")
+	portPath := utils.AppHomeDir("instance.port")
 	lockFile, err := singleinstance.CreateLockFile(lockPath)
 	if err != nil {
+		if platform.Notify(portPath) {
+			logger.Info("Handed this launch to the MyReviser already running")
+			return
+		}
 		logger.Error("Another instance is already running", "error", err)
 		os.Exit(1)
 	}
 	defer lockFile.Close()
+
+	handover := platform.NewHandover(portPath)
+	defer handover.Close()
 
 	// Load configuration
 	cfg, err := config.Load()
@@ -57,6 +66,8 @@ func main() {
 		logger.Error("Failed to create application", "error", err)
 		os.Exit(1)
 	}
+
+	handover.Serve(application.ShowWindow)
 
 	// Run the application
 	if err := application.Start(); err != nil {

@@ -265,6 +265,12 @@ func (a *Application) monitorPermissions(ctx context.Context, previous permissio
 	}
 }
 
+// ShowWindow brings the settings window up. Safe to call from any goroutine, which is what the
+// instance handover needs.
+func (a *Application) ShowWindow() {
+	fyne.Do(a.mainWindow.ShowWindow)
+}
+
 // Start starts the application
 func (a *Application) Start() error {
 	// Start hotkey manager

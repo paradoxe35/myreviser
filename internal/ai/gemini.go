@@ -44,8 +44,8 @@ type ThinkingConfig struct {
 }
 
 type GenerationConfig struct {
-	ThinkingConfig ThinkingConfig `json:"thinkingConfig"`
-	Temperature    float64        `json:"temperature"`
+	ThinkingConfig *ThinkingConfig `json:"thinkingConfig,omitempty"`
+	Temperature    float64         `json:"temperature"`
 }
 
 // GeminiRequest represents the request structure for Gemini API
@@ -94,16 +94,18 @@ func (p *GeminiProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 		},
 	}
 
-	requestBody := GeminiRequest{
-		Contents: contents,
-		GenerationConfig: GenerationConfig{
-			ThinkingConfig: ThinkingConfig{
-				ThinkingBudget: 0,
-			},
-			Temperature: p.Temperature,
-		},
-	}
+	// A zero budget is refused outright by the models that cannot switch thinking off, so the
+	// request is retried without it rather than failing the user's correction.
+	return withReasoningFallback(p.BaseURL, p.Model, true, func(includeReasoning bool) (string, error) {
+		config := GenerationConfig{Temperature: p.Temperature}
+		if includeReasoning {
+			config.ThinkingConfig = &ThinkingConfig{ThinkingBudget: 0}
+		}
+		return p.send(ctx, GeminiRequest{Contents: contents, GenerationConfig: config})
+	})
+}
 
+func (p *GeminiProvider) send(ctx context.Context, requestBody GeminiRequest) (string, error) {
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)

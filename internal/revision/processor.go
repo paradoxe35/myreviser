@@ -73,11 +73,10 @@ func (p *Processor) initializeProviders() error {
 		return fmt.Errorf("failed to get API key: %w", err)
 	}
 
-	if strings.TrimSpace(apiKey) == "" {
+	settings := cfg.GetProviderSettings(currentProvider)
+	if settings.RequiresAPIKey() && strings.TrimSpace(apiKey) == "" {
 		return fmt.Errorf("API key is empty for provider: %s", currentProvider)
 	}
-
-	settings := cfg.GetProviderSettings(currentProvider)
 
 	var provider ai.Provider
 
@@ -106,6 +105,8 @@ func (p *Processor) initializeProviders() error {
 			return fmt.Errorf("unknown provider: %s", currentProvider)
 		}
 	}
+
+	applyReasoning(provider, settings)
 
 	p.providerFactory.Register(currentProvider, provider)
 	p.providerFactory.SetCurrent(currentProvider)
@@ -385,11 +386,14 @@ func (p *Processor) getOrCreateProvider(name string) (ai.Provider, error) {
 	p.mu.Unlock()
 
 	apiKey, err := cfg.GetAPIKey(name)
-	if err != nil || apiKey == "" {
+	if err != nil {
 		return nil, fmt.Errorf("no API key configured for %s", name)
 	}
 
 	settings := cfg.GetProviderSettings(name)
+	if settings.RequiresAPIKey() && strings.TrimSpace(apiKey) == "" {
+		return nil, fmt.Errorf("no API key configured for %s", name)
+	}
 
 	var provider ai.Provider
 
@@ -412,6 +416,15 @@ func (p *Processor) getOrCreateProvider(name string) (ai.Provider, error) {
 		}
 	}
 
+	applyReasoning(provider, settings)
+
 	p.providerFactory.Register(name, provider)
 	return provider, nil
+}
+
+// applyReasoning reaches only the providers that have a reasoning parameter to send.
+func applyReasoning(provider ai.Provider, settings config.ProviderSettings) {
+	if aware, ok := provider.(ai.ReasoningAware); ok {
+		aware.SetLowReasoning(settings.LowReasoning)
+	}
 }

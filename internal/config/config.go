@@ -38,6 +38,16 @@ type ProviderSettings struct {
 	Temperature  float64 `json:"temperature,omitempty"`
 	IsCustom     bool    `json:"is_custom,omitempty"`
 	ProviderType string  `json:"provider_type,omitempty"`
+	// NoAPIKey suits a model running on this machine. Absent means a key is required, so every
+	// configuration written before this existed keeps its meaning.
+	NoAPIKey bool `json:"no_api_key,omitempty"`
+	// LowReasoning asks a reasoning model to think less. Off by default: a model that does not
+	// reason rejects the parameter, and the retry that recovers from it costs a round trip.
+	LowReasoning bool `json:"low_reasoning,omitempty"`
+}
+
+func (s ProviderSettings) RequiresAPIKey() bool {
+	return !s.NoAPIKey
 }
 
 type AIProviderConfig struct {

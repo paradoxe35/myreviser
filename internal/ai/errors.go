@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// APIError carries the status alongside the message, so a caller can react to a 400 without
+// matching on wording that every provider spells differently.
+type APIError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *APIError) Error() string { return e.Message }
+
+func apiError(statusCode int, format string, args ...any) error {
+	return &APIError{StatusCode: statusCode, Message: fmt.Sprintf(format, args...)}
+}
+
 // ParseAPIError creates a user-friendly error message from API response
 func ParseAPIError(statusCode int, body []byte, providerName string) error {
 	// Try to parse as generic structured error
@@ -19,21 +32,21 @@ func ParseAPIError(statusCode int, body []byte, providerName string) error {
 	}
 
 	if json.Unmarshal(body, &errResp) == nil && errResp.Error != nil {
-		return fmt.Errorf("API error (%d): %s", statusCode, errResp.Error.Message)
+		return apiError(statusCode, "API error (%d): %s", statusCode, errResp.Error.Message)
 	}
 
 	// Fallback to status-based messages
 	switch statusCode {
 	case 401:
-		return fmt.Errorf("authentication failed: invalid API key or credentials")
+		return apiError(statusCode, "authentication failed: invalid API key or credentials")
 	case 403:
-		return fmt.Errorf("access forbidden: check your API key permissions")
+		return apiError(statusCode, "access forbidden: check your API key permissions")
 	case 404:
-		return fmt.Errorf("endpoint not found: verify the base URL is correct")
+		return apiError(statusCode, "endpoint not found: verify the base URL is correct")
 	case 429:
-		return fmt.Errorf("rate limit exceeded: please try again later")
+		return apiError(statusCode, "rate limit exceeded: please try again later")
 	case 500, 502, 503, 504:
-		return fmt.Errorf("API server error (%d): service may be temporarily unavailable", statusCode)
+		return apiError(statusCode, "API server error (%d): service may be temporarily unavailable", statusCode)
 	default:
 		// Include first 100 chars of body if available
 		preview := string(body)
@@ -41,9 +54,9 @@ func ParseAPIError(statusCode int, body []byte, providerName string) error {
 			preview = preview[:100] + "..."
 		}
 		if len(preview) > 0 {
-			return fmt.Errorf("API request failed (%d): %s", statusCode, preview)
+			return apiError(statusCode, "API request failed (%d): %s", statusCode, preview)
 		}
-		return fmt.Errorf("API request failed with status code %d", statusCode)
+		return apiError(statusCode, "API request failed with status code %d", statusCode)
 	}
 }
 

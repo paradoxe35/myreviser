@@ -913,6 +913,18 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 	apiKeyEntry := widget.NewPasswordEntry()
 	apiKeyEntry.PlaceHolder = "Enter API key"
 
+	requiresKey := widget.NewCheck("Requires an API key", func(checked bool) {
+		if checked {
+			apiKeyEntry.Enable()
+		} else {
+			apiKeyEntry.SetText("")
+			apiKeyEntry.Disable()
+		}
+	})
+	requiresKey.SetChecked(true)
+
+	lowReasoning := widget.NewCheck("Ask reasoning models to think less", nil)
+
 	modelEntry := widget.NewEntry()
 	modelEntry.PlaceHolder = "e.g., gpt-4 or llama3"
 
@@ -933,6 +945,8 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 		widget.NewSeparator(),
 		widget.NewLabel("API Key:"),
 		apiKeyEntry,
+		requiresKey,
+		lowReasoning,
 		widget.NewSeparator(),
 		widget.NewLabel("Model:"),
 		container.NewBorder(nil, nil, nil, fetchModelsBtn, modelEntry),
@@ -966,6 +980,8 @@ func (w *MainWindow) showAddCustomProviderDialog() {
 			Temperature:  1.0,
 			IsCustom:     true,
 			ProviderType: config.ProviderTypeOpenAICompatible,
+			NoAPIKey:     !requiresKey.Checked,
+			LowReasoning: lowReasoning.Checked,
 		}
 
 		if err := w.config.AddCustomProvider(name, settings); err != nil {

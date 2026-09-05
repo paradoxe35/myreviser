@@ -31,6 +31,12 @@ func (p *CustomProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 	return p.inner.ReviseText(ctx, text, systemPrompt)
 }
 
+func (p *CustomProvider) SetLowReasoning(low bool) {
+	if aware, ok := p.inner.(ReasoningAware); ok {
+		aware.SetLowReasoning(low)
+	}
+}
+
 func (p *CustomProvider) ValidateConfig() error {
 	return p.inner.ValidateConfig()
 }
