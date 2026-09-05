@@ -138,6 +138,27 @@ func (h *FFIHotkeyManager) RegisterHotkey(binding, action string, handler func()
 	return nil
 }
 
+// ListenError reports why the listener is not running, or "" when it is.
+//
+// Start only spawns the thread; the system refuses the key tap afterwards, on that thread, so a
+// successful start says nothing about whether shortcuts will ever fire.
+func (h *FFIHotkeyManager) ListenError() string {
+	if h.handle == nil {
+		return ""
+	}
+
+	h.ffiMu.Lock()
+	cStr := C.myreviser_hotkey_listen_error(h.handle)
+	h.ffiMu.Unlock()
+
+	if cStr == nil {
+		return ""
+	}
+	defer C.myreviser_free_string(cStr)
+
+	return C.GoString(cStr)
+}
+
 // Start starts listening for hotkeys
 func (h *FFIHotkeyManager) Start() error {
 	h.mu.Lock()

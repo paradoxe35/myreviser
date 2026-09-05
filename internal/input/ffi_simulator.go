@@ -86,6 +86,24 @@ func (s *FFIKeySimulator) Paste() error {
 	return nil
 }
 
+// ReleaseModifiers drops modifiers still held from the triggering hotkey.
+//
+// Without it, simulating Ctrl+A while Alt is still down sends Ctrl+Alt+A and selects nothing.
+// On macOS this also waits for the keyboard to agree the keys are up, because a posted event is
+// merged with the modifiers still being held.
+func (s *FFIKeySimulator) ReleaseModifiers() error {
+	if s.handle == nil {
+		return fmt.Errorf("key simulator not initialized")
+	}
+
+	result := C.myreviser_simulate_release_modifiers(s.handle)
+	if result != 0 {
+		return fmt.Errorf("failed to release modifiers: %s", getLastError())
+	}
+
+	return nil
+}
+
 // Close frees the key simulator resources
 func (s *FFIKeySimulator) Close() {
 	if s.handle != nil {

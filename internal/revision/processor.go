@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/paradoxe35/myreviser/internal/ai"
 	"github.com/paradoxe35/myreviser/internal/config"
@@ -112,131 +114,101 @@ func (p *Processor) initializeProviders() error {
 	return nil
 }
 
-// ProcessSelectAll processes text with select all
-func (p *Processor) ProcessSelectAll() error {
+// begin takes the one-at-a-time guard. Two overlapping runs would fight over the clipboard, a
+// single global resource each of them saves and restores.
+func (p *Processor) begin() (func(), error) {
 	p.mu.Lock()
 	if p.processing {
 		p.mu.Unlock()
 		logger.Warn("Already processing a revision")
-		return fmt.Errorf("already processing a revision, please wait")
+		return nil, fmt.Errorf("already processing a revision, please wait")
 	}
 	p.processing = true
 	p.mu.Unlock()
 
-	// Ensure we clear processing flag on exit
-	defer func() {
+	return func() {
 		p.mu.Lock()
 		p.processing = false
 		p.mu.Unlock()
-	}()
+	}, nil
+}
+
+func outcomeError(outcome input.CaptureOutcome) error {
+	switch outcome {
+	case input.CaptureNothingSelected:
+		return fmt.Errorf("no text selected")
+	case input.CaptureCopyFailed:
+		return fmt.Errorf("could not copy from that window - some applications block it")
+	default:
+		return nil
+	}
+}
+
+// ProcessSelectAll selects the whole field, revises it, and writes the result back.
+func (p *Processor) ProcessSelectAll() error {
+	release, err := p.begin()
+	if err != nil {
+		return err
+	}
+	defer release()
 
 	logger.Info("Starting select all revision")
 
-	// Wait for hotkey processing and clipboard operations
-	time.Sleep(250 * time.Millisecond)
-
-	if err := p.clipboardManager.SaveCurrent(); err != nil {
-		return fmt.Errorf("failed to save clipboard: %w", err)
-	}
-
-	time.Sleep(75 * time.Millisecond)
-
-	if err := input.FFISimulateSelectAll(); err != nil {
-		return fmt.Errorf("failed to select all: %w", err)
-	}
-
-	time.Sleep(100 * time.Millisecond)
-
-	if err := input.FFISimulateCopy(); err != nil {
-		return fmt.Errorf("failed to copy: %w", err)
-	}
-
-	// Wait for clipboard synchronization
-	time.Sleep(150 * time.Millisecond)
-
-	// Get text from clipboard
-	text, err := p.clipboardManager.GetText()
+	text, outcome, err := p.clipboardManager.CaptureAll()
 	if err != nil {
-		p.clipboardManager.Restore()
-		return fmt.Errorf("failed to get clipboard text: %w", err)
+		return err
 	}
-
-	if strings.TrimSpace(text) == "" {
-		p.clipboardManager.Restore()
-		return fmt.Errorf("no text to revise (clipboard is empty or contains only whitespace)")
+	if err := outcomeError(outcome); err != nil {
+		return err
 	}
 
 	revisedText, err := p.reviseText(text)
 	if err != nil {
-		p.clipboardManager.Restore()
+		p.clipboardManager.Abandon()
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
+	// Selected again: a field can drop its selection while the model is working, and pasting
+	// without one inserts the revision beside the original instead of replacing it.
 	if err := input.FFISimulateSelectAll(); err != nil {
-		p.clipboardManager.Restore()
+		p.clipboardManager.Abandon()
 		return fmt.Errorf("failed to select all for paste: %w", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
-		p.clipboardManager.Restore()
 		return fmt.Errorf("failed to replace text: %w", err)
-	}
-
-	if err := p.clipboardManager.Restore(); err != nil {
-		logger.Error("Failed to restore clipboard", "error", err)
 	}
 
 	logger.Info("Select all revision completed")
 	return nil
 }
 
-// ProcessSelection processes selected text
+// ProcessSelection revises whatever the user has selected, leaving the rest of the field alone.
 func (p *Processor) ProcessSelection() error {
-	p.mu.Lock()
-	if p.processing {
-		p.mu.Unlock()
-		logger.Warn("Already processing a revision")
-		return fmt.Errorf("already processing a revision, please wait")
+	release, err := p.begin()
+	if err != nil {
+		return err
 	}
-	p.processing = true
-	p.mu.Unlock()
-
-	// Ensure we clear processing flag on exit
-	defer func() {
-		p.mu.Lock()
-		p.processing = false
-		p.mu.Unlock()
-	}()
+	defer release()
 
 	logger.Info("Starting selection revision")
 
-	time.Sleep(250 * time.Millisecond)
-
-	text, err := p.clipboardManager.CaptureSelectedText()
+	text, outcome, err := p.clipboardManager.CaptureSelection()
 	if err != nil {
-		p.clipboardManager.Restore()
-		return fmt.Errorf("failed to capture selected text: %w", err)
+		return err
 	}
-
-	if strings.TrimSpace(text) == "" {
-		p.clipboardManager.Restore()
-		return fmt.Errorf("no text selected or selection is empty")
+	if err := outcomeError(outcome); err != nil {
+		return err
 	}
 
 	revisedText, err := p.reviseText(text)
 	if err != nil {
-		p.clipboardManager.Restore()
+		p.clipboardManager.Abandon()
 		return fmt.Errorf("failed to revise text: %w", err)
 	}
 
 	if err := p.clipboardManager.ReplaceSelectedText(revisedText); err != nil {
 		return fmt.Errorf("failed to replace selected text: %w", err)
-	}
-
-	if err := p.clipboardManager.Restore(); err != nil {
-		logger.Warn("Failed to restore clipboard after paste", "error", err)
 	}
 
 	logger.Info("Selection revision completed")
@@ -260,13 +232,11 @@ func (p *Processor) reviseText(text string) (string, error) {
 		return "", fmt.Errorf("text is empty or contains only whitespace")
 	}
 
-	if len(textToRevise) > cfg.Revision.CharacterLimit {
+	// Counted in characters, not bytes: an accented letter is two bytes in UTF-8, so len() halved
+	// the limit for exactly the text this app exists to correct.
+	if characters := utf8.RuneCountInString(trimmedText); characters > cfg.Revision.CharacterLimit {
 		return "", fmt.Errorf("text exceeds character limit (%d > %d)",
-			len(textToRevise), cfg.Revision.CharacterLimit)
-	}
-
-	if len(trimmedText) < 1 {
-		return "", fmt.Errorf("text too short to revise")
+			characters, cfg.Revision.CharacterLimit)
 	}
 
 	var provider ai.Provider
@@ -297,27 +267,35 @@ func (p *Processor) reviseText(text string) (string, error) {
 		"provider", provider.GetName(),
 		"model", provider.GetModel(),
 		"temperature", provider.GetTemperature(),
-		"text", textToRevise,
-		"text_length", len(textToRevise),
+		"characters", utf8.RuneCountInString(trimmedText),
 	)
 
-	revised, err := provider.ReviseText(ctx, textToRevise, p.config.Revision.SystemPrompt)
+	revised, err := provider.ReviseText(ctx, trimmedText, p.config.Revision.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("AI revision failed: %w", err)
 	}
 
-	revisedTrimmed := strings.TrimSpace(revised)
-	if revisedTrimmed == "" {
+	cleaned := ai.CleanResponse(revised)
+	if cleaned == "" {
 		return "", fmt.Errorf("AI provider returned empty response")
 	}
 
 	logger.Info("Text revised successfully",
-		"revised", revised,
-		"original_length", len(textToRevise),
-		"revised_length", len(revised),
+		"original_characters", utf8.RuneCountInString(trimmedText),
+		"revised_characters", utf8.RuneCountInString(cleaned),
 	)
 
-	return revised, nil
+	// The reply replaces the selection as it was, so the selection's own edges go back on. Without
+	// them "word " returns as "word" and runs into the next one.
+	return leadingWhitespace(textToRevise) + cleaned + trailingWhitespace(textToRevise), nil
+}
+
+func leadingWhitespace(text string) string {
+	return text[:len(text)-len(strings.TrimLeftFunc(text, unicode.IsSpace))]
+}
+
+func trailingWhitespace(text string) string {
+	return text[len(strings.TrimRightFunc(text, unicode.IsSpace)):]
 }
 
 // UpdateProvider updates the AI provider

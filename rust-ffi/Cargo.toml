@@ -13,13 +13,15 @@ crate-type = ["staticlib"]  # Static library for Go CGO
 [dependencies]
 # Core dependencies for system input
 # Use rustdesk-org/rdev fork for Linux Wayland support (grab uses evdev, works on X11 and Wayland)
-# This fork is required for macOS compatibility and has Wayland fixes
-rdev = { git = "https://github.com/rustdesk-org/rdev" }
+# This fork is required for macOS compatibility and has Wayland fixes.
+#
+# Pinned to the revision this app has always resolved to. Unpinned, a fresh checkout picks up
+# whatever the branch tip is that day, so CI, a release build and a developer's machine can each
+# carry different input code — the one variable you cannot afford when a shortcut fires on one
+# machine and not another.
+rdev = { git = "https://github.com/rustdesk-org/rdev", rev = "a90dbe1172f8832f54c97c62e823c5a34af5fdfe" }
 arboard = { version = "3.6", features = ["wayland-data-control"] }  # Clipboard with Wayland support
 enigo = { version = "0.6", features = ["wayland", "x11rb"] }  # Keyboard simulation with Wayland and X11 support
-
-# Async runtime
-tokio = { version = "1.41", features = ["rt", "sync", "time"] }
 
 # Error handling
 anyhow = "1.0"
@@ -44,4 +46,6 @@ opt-level = "z"        # Optimize for size
 lto = true             # Link-time optimization
 codegen-units = 1      # Single codegen unit for better optimization
 strip = true           # Strip debug symbols
-panic = "abort"        # Reduce binary size (no unwinding)
+# The hotkey callbacks wrap themselves in catch_unwind, which `abort` makes dead code: a panic on
+# the listener thread would take the whole app down instead.
+panic = "unwind"

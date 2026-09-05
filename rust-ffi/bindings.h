@@ -20,12 +20,15 @@ typedef void *myreviser_ClipboardHandle;
 typedef void *myreviser_HotkeyManagerHandle;
 
 /**
- * Hotkey callback function type
- * The callback receives the action string that was registered
+ * Receives the action string the binding was registered with.
  */
 typedef void (*myreviser_HotkeyCallback)(const char*);
 
 typedef void *myreviser_SimulatorHandle;
+
+#if defined(MYREVISER_MACOS)
+extern bool CGEventSourceKeyState(int32_t state_id, uint16_t key);
+#endif
 
 /**
  * Get the last error message
@@ -41,9 +44,23 @@ void myreviser_free_string(char *s);
 
 myreviser_ClipboardHandle myreviser_clipboard_new(void);
 
+/**
+ * Null when the clipboard holds no text, including when it holds an image.
+ */
 char *myreviser_clipboard_get_text(myreviser_ClipboardHandle handle);
 
+/**
+ * 1 when the clipboard holds text, 0 when not. Distinguishes "copied a picture" from
+ * "the copy never landed", which look identical through `get_text`.
+ */
+int myreviser_clipboard_has_text(myreviser_ClipboardHandle handle);
+
 int myreviser_clipboard_set_text(myreviser_ClipboardHandle handle, const char *text);
+
+/**
+ * Empties the clipboard, so a following simulated copy landing becomes observable.
+ */
+int myreviser_clipboard_clear(myreviser_ClipboardHandle handle);
 
 int myreviser_clipboard_save(myreviser_ClipboardHandle handle);
 
@@ -64,6 +81,11 @@ int myreviser_hotkey_start(myreviser_HotkeyManagerHandle handle);
 
 int myreviser_hotkey_stop(myreviser_HotkeyManagerHandle handle);
 
+/**
+ * Null when the listener is running. The caller frees the string with `myreviser_free_string`.
+ */
+char *myreviser_hotkey_listen_error(myreviser_HotkeyManagerHandle handle);
+
 void myreviser_hotkey_manager_free(myreviser_HotkeyManagerHandle handle);
 
 myreviser_SimulatorHandle myreviser_simulator_new(void);
@@ -73,6 +95,11 @@ int myreviser_simulate_select_all(myreviser_SimulatorHandle handle);
 int myreviser_simulate_copy(myreviser_SimulatorHandle handle);
 
 int myreviser_simulate_paste(myreviser_SimulatorHandle handle);
+
+/**
+ * Releases modifiers still held from the triggering hotkey. Call once before any combo.
+ */
+int myreviser_simulate_release_modifiers(myreviser_SimulatorHandle handle);
 
 void myreviser_simulator_free(myreviser_SimulatorHandle handle);
 

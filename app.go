@@ -107,7 +107,7 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 // setupHotkeys configures the hotkey handlers
 func (a *Application) setupHotkeys() {
 	// Register select_all handler with FFI
-	a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.SelectAll, "select_all", func() {
+	err := a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.SelectAll, "select_all", func() {
 		logger.Info("Select all hotkey triggered")
 
 		// Check if already processing
@@ -124,9 +124,10 @@ func (a *Application) setupHotkeys() {
 			logger.Info("Text revised successfully")
 		}
 	})
+	a.reportBindingFailure(a.config.Hotkeys.SelectAll, err)
 
 	// Register selection handler with FFI
-	a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.Selection, "selection", func() {
+	err = a.hotkeyManager.RegisterHotkey(a.config.Hotkeys.Selection, "selection", func() {
 		logger.Info("Selection hotkey triggered")
 
 		// Check if already processing
@@ -143,6 +144,19 @@ func (a *Application) setupHotkeys() {
 			logger.Info("Text revised successfully")
 		}
 	})
+	a.reportBindingFailure(a.config.Hotkeys.Selection, err)
+}
+
+// reportBindingFailure says so when a shortcut could not be registered.
+//
+// Silence here is the worst outcome: an unregistered binding is indistinguishable from one the
+// system never delivers, and the settings screen goes on showing it as if it worked.
+func (a *Application) reportBindingFailure(binding string, err error) {
+	if err == nil {
+		return
+	}
+	logger.Error("Could not register shortcut", "binding", binding, "error", err)
+	a.notifications.ShowError("Shortcut not registered", binding+": "+err.Error())
 }
 
 // reloadHotkeysFromConfig stops current hotkeys and re-registers with new config
@@ -259,6 +273,18 @@ func (a *Application) Start() error {
 	}
 
 	logger.Info("Application started successfully")
+
+	// Starting only spawns the listener thread; the system refuses the key tap after that, on that
+	// thread. Without this the app reports itself healthy while no shortcut can ever fire.
+	go func() {
+		time.Sleep(2 * time.Second)
+		if reason := a.hotkeyManager.ListenError(); reason != "" {
+			logger.Error("Shortcuts will not fire", "reason", reason)
+			fyne.Do(func() {
+				a.notifications.ShowError("Shortcuts are not listening", reason)
+			})
+		}
+	}()
 
 	// Show window if permissions are pending, it's first run, or not set to start minimized
 	if a.permissionsMissingOnLaunch {

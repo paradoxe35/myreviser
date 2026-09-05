@@ -267,9 +267,11 @@ func (h *HotkeyCapture) handleKeyPress(key *fyne.KeyEvent) {
 	case desktop.KeySuperLeft, desktop.KeySuperRight:
 		h.modifiers[fyne.KeyModifierSuper] = true
 	default:
-		// Track the actual key (not modifiers), allow up to 3 regular keys
-		if !isModifierKey(key.Name) && len(h.pressedKeys) < 3 {
-			h.pressedKeys[key.Name] = true
+		// One key, replacing any previous. The listener matches modifiers plus a single key, so a
+		// combination naming two was stored with only the last one meaningful — and a map has no
+		// order, so which one that was varied between saves.
+		if !isModifierKey(key.Name) {
+			h.pressedKeys = map[fyne.KeyName]bool{key.Name: true}
 		}
 	}
 
