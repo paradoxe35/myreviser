@@ -16,8 +16,13 @@ type OpenAIProvider struct {
 	BaseURL     string
 	Model       string
 	Temperature float64
-	client      *http.Client
+	// LowReasoning asks a reasoning model to think less. A correction is not a puzzle, and the
+	// tokens it spends thinking are billed and thrown away.
+	LowReasoning bool
+	client       *http.Client
 }
+
+func (p *OpenAIProvider) SetLowReasoning(low bool) { p.LowReasoning = low }
 
 // NewOpenAIProvider creates a new OpenAI provider
 func NewOpenAIProvider(apiKey, baseURL, model string, temperature float64) *OpenAIProvider {
@@ -41,9 +46,18 @@ func NewOpenAIProvider(apiKey, baseURL, model string, temperature float64) *Open
 
 // OpenAIRequest represents the request structure for OpenAI API
 type OpenAIRequest struct {
-	Model       string          `json:"model"`
-	Messages    []OpenAIMessage `json:"messages"`
-	Temperature float64         `json:"temperature"`
+	Model           string               `json:"model"`
+	Messages        []OpenAIMessage      `json:"messages"`
+	Temperature     float64              `json:"temperature"`
+	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
+	Reasoning       *OpenRouterReasoning `json:"reasoning,omitempty"`
+}
+
+// OpenRouterReasoning is OpenRouter's own shape, which it normalises across every model it serves.
+type OpenRouterReasoning struct {
+	Effort string `json:"effort"`
+	// Reasoning tokens are billed and useless here: only the rewritten text is wanted.
+	Exclude bool `json:"exclude"`
 }
 
 // OpenAIMessage represents a message in the OpenAI API
@@ -75,12 +89,23 @@ func (p *OpenAIProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 		{Role: "user", Content: text},
 	}
 
-	requestBody := OpenAIRequest{
-		Model:       p.Model,
-		Messages:    messages,
-		Temperature: p.Temperature,
-	}
+	return withReasoningFallback(p.BaseURL, p.Model, p.LowReasoning, func(includeReasoning bool) (string, error) {
+		body := OpenAIRequest{Model: p.Model, Messages: messages, Temperature: p.Temperature}
+		if includeReasoning {
+			// "low" rather than "none": it is the value the widest range of models accept, and
+			// some refuse to have reasoning switched off entirely.
+			switch DetectReasoningStyle(p.BaseURL) {
+			case ReasoningOpenRouter:
+				body.Reasoning = &OpenRouterReasoning{Effort: "low", Exclude: true}
+			default:
+				body.ReasoningEffort = "low"
+			}
+		}
+		return p.send(ctx, body)
+	})
+}
 
+func (p *OpenAIProvider) send(ctx context.Context, requestBody OpenAIRequest) (string, error) {
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
@@ -92,7 +117,10 @@ func (p *OpenAIProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	// A local runtime takes no credentials, and an empty bearer is worse than none: some reject it.
+	if p.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -128,9 +156,6 @@ func (p *OpenAIProvider) ReviseText(ctx context.Context, text, systemPrompt stri
 
 // ValidateConfig validates the provider configuration
 func (p *OpenAIProvider) ValidateConfig() error {
-	if p.APIKey == "" {
-		return fmt.Errorf("OpenAI API key is required")
-	}
 	if p.BaseURL == "" {
 		return fmt.Errorf("OpenAI base URL is required")
 	}

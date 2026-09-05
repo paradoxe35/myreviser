@@ -1,0 +1,78 @@
+package ai
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+// geminiServer records whether each request carried a thinking budget.
+func geminiServer(t *testing.T, replies ...func(w http.ResponseWriter)) (*httptest.Server, *[]GeminiRequest) {
+	t.Helper()
+	var seen []GeminiRequest
+	attempt := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var body GeminiRequest
+		_ = json.Unmarshal(raw, &body)
+		seen = append(seen, body)
+
+		reply := replies[len(replies)-1]
+		if attempt < len(replies) {
+			reply = replies[attempt]
+		}
+		attempt++
+		reply(w)
+	}))
+	t.Cleanup(server.Close)
+
+	return server, &seen
+}
+
+func geminiOK(w http.ResponseWriter) {
+	io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"corrigé"}]}}]}`)
+}
+
+func TestGeminiAsksForNoThinking(t *testing.T) {
+	clearReasoningCache()
+	server, seen := geminiServer(t, geminiOK)
+
+	if _, err := NewGeminiProvider("k", server.URL, "gemini-test", 1.0).
+		ReviseText(context.Background(), "text", "prompt"); err != nil {
+		t.Fatalf("revise: %v", err)
+	}
+
+	if len(*seen) != 1 || (*seen)[0].GenerationConfig.ThinkingConfig == nil {
+		t.Fatalf("expected a thinking budget, got %+v", *seen)
+	}
+}
+
+// The bug this exists for: a model that cannot switch thinking off rejects a zero budget outright,
+// and the correction used to fail with it.
+func TestGeminiRetriesWithoutTheBudgetWhenRefused(t *testing.T) {
+	clearReasoningCache()
+	server, seen := geminiServer(t, badRequest, geminiOK)
+
+	result, err := NewGeminiProvider("k", server.URL, "gemini-pro-test", 1.0).
+		ReviseText(context.Background(), "text", "prompt")
+	if err != nil {
+		t.Fatalf("revise: %v", err)
+	}
+
+	if result != "corrigé" {
+		t.Fatalf("expected the retry's result, got %q", result)
+	}
+	if len(*seen) != 2 {
+		t.Fatalf("expected one retry, got %d requests", len(*seen))
+	}
+	if (*seen)[0].GenerationConfig.ThinkingConfig == nil {
+		t.Fatal("the first attempt should carry the budget")
+	}
+	if (*seen)[1].GenerationConfig.ThinkingConfig != nil {
+		t.Fatal("the retry should drop the budget")
+	}
+}
