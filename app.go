@@ -94,6 +94,7 @@ func NewApplication(app fyne.App, cfg *config.Config) (*Application, error) {
 	// Set tray tooltip
 	app.Lifecycle().SetOnStarted(func() {
 		systray.SetTooltip("MyReviser - AI Text Revision Tool")
+		installReopenHandler(application.ShowWindow)
 	})
 
 	// Setup window close intercept

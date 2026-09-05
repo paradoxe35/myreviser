@@ -794,11 +794,12 @@ func (w *MainWindow) ShowAndRun() {
 
 // ShowWindow shows the window and handles platform-specific behavior (e.g., macOS Dock)
 func (w *MainWindow) ShowWindow() {
-	// Call the platform-specific show handler if set
+	w.Show()
+	// After the window exists: the Dock entry activates the app, and activating with nothing on
+	// screen is what leaves it frontmost and empty.
 	if w.onShowCallback != nil {
 		w.onShowCallback()
 	}
-	w.Show()
 	w.RequestFocus()
 
 	// Force layout refresh after show to fix Windows minimize/restore sizing issue
