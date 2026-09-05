@@ -87,7 +87,7 @@ jobs:
             libxkbcommon-dev
 
       - name: Install Fyne CLI
-        run: go install fyne.io/tools/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@v1.7.2
 
       - name: Install dependencies
         run: go mod download
@@ -121,22 +121,22 @@ jobs:
             --app-version "${VERSION}" \
             --app-build "${BUILD_NUMBER}"
 
-          # Extract MyReviser.tar.xz
-          tar -xf MyReviser.tar.xz
+          # The CLI wraps the tree in a directory named after the binary, which older versions did
+          # not, so the binary is located by its path inside the archive rather than at a fixed one.
+          mkdir -p pkg
+          tar -xf MyReviser.tar.xz -C pkg
 
-          # Find the binary in usr/local/bin (module name is myreviser-go)
-          BINARY=$(find usr/local/bin -type f -executable | head -n 1)
-          if [ -n "$BINARY" ]; then
-            echo "Found binary: $BINARY"
-            mv "$BINARY" myreviser-linux-${{ matrix.arch }}
-          else
-            echo "Error: No binary found"
-            ls -la usr/local/bin/
+          BINARY=$(find pkg -path "*/usr/local/bin/*" -type f -perm -u+x | head -n 1)
+          if [ -z "$BINARY" ]; then
+            echo "Error: no binary in MyReviser.tar.xz"
+            tar -tf MyReviser.tar.xz
             exit 1
           fi
 
-          # Clean up
-          rm -rf usr MyReviser.tar.xz
+          echo "Found binary: $BINARY"
+          mv "$BINARY" myreviser-linux-${{ matrix.arch }}
+
+          rm -rf pkg MyReviser.tar.xz
 
       - name: Create portable archive
         run: |
@@ -357,7 +357,7 @@ jobs:
         run: rustup target add x86_64-pc-windows-gnu
 
       - name: Install Fyne CLI
-        run: go install fyne.io/tools/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@v1.7.2
 
       - name: Install dependencies
         run: go mod download
@@ -637,7 +637,7 @@ jobs:
           fi
 
       - name: Install Fyne CLI
-        run: go install fyne.io/tools/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@v1.7.2
 
       - name: Install dependencies
         run: go mod download
