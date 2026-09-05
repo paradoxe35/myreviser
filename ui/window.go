@@ -788,10 +788,6 @@ func (w *MainWindow) saveSettings() {
 	}
 }
 
-func (w *MainWindow) ShowAndRun() {
-	w.Window.ShowAndRun()
-}
-
 // ShowWindow shows the window and handles platform-specific behavior (e.g., macOS Dock)
 func (w *MainWindow) ShowWindow() {
 	w.Show()

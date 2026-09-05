@@ -273,13 +273,12 @@ func (h *FFIHotkeyManager) Enable() {
 //
 //export hotkeyCallbackGateway
 func hotkeyCallbackGateway(action *C.char) {
-	var actionStr string
-	if action != nil {
-		actionStr = C.GoString(action)
-		C.myreviser_free_string(action)
-	} else {
+	if action == nil {
 		return
 	}
+	// Lent for the duration of this call, not handed over: Rust frees it when the callback
+	// returns, so this copies and must not free it.
+	actionStr := C.GoString(action)
 
 	globalFFIMu.Lock()
 	manager := globalFFIHotkeyManager
