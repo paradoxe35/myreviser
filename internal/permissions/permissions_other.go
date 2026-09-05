@@ -12,8 +12,5 @@ func CurrentState() State {
 	return State{AccessibilityGranted: true, InputMonitoringGranted: true}
 }
 
-// RequestPermission is a no-op on non-macOS platforms.
-func RequestPermission(t Type) {}
-
 // OpenPreference is a no-op on non-macOS platforms.
 func OpenPreference(t Type) {}

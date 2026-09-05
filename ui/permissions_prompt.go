@@ -26,13 +26,12 @@ func newPermissionPrompt() *permissionPrompt {
 	info.Wrapping = fyne.TextWrapWord
 
 	accessibilityButton := newPermissionButton("Grant Access", func() {
-		permissions.RequestPermission(permissions.Accessibility)
 		permissions.OpenPreference(permissions.Accessibility)
 	})
 
 	accessibilitySection := buildPermissionRow(
 		"Accessibility",
-		"Required to automate keyboard input and clipboard operations.",
+		"Required to automate keyboard input and clipboard operations. If MyReviser is not in the list, add it with +.",
 		accessibilityButton,
 	)
 

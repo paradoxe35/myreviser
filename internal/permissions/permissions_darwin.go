@@ -13,12 +13,6 @@ bool IsAccessibilityTrusted(void) {
     return AXIsProcessTrusted();
 }
 
-// Ask macOS to display the Accessibility permission prompt.
-bool RequestAccessibilityPermissions(void) {
-    NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt: @YES};
-    return AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
-}
-
 // Dummy callback used to probe Input Monitoring permissions.
 static CGEventRef DummyEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
     return event;
@@ -67,17 +61,6 @@ func CurrentState() State {
 	return State{
 		AccessibilityGranted:   bool(C.IsAccessibilityTrusted()),
 		InputMonitoringGranted: bool(C.HasInputMonitoringPermission()),
-	}
-}
-
-// RequestPermission attempts to trigger the system prompt for the given permission.
-// For Input Monitoring there is no programmatic prompt, so we fall back to opening preferences.
-func RequestPermission(t Type) {
-	switch t {
-	case Accessibility:
-		C.RequestAccessibilityPermissions()
-	case InputMonitoring:
-		OpenPreference(InputMonitoring)
 	}
 }
 

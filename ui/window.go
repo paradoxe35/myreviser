@@ -109,11 +109,6 @@ func NewMainWindow(app fyne.App, cfg *config.Config, hotkeyManager *input.FFIHot
 	window.SetContent(mw.rootContainer)
 	mw.showMainContent()
 
-	// Hide window if start minimized and not first run
-	if cfg.Appearance.StartMinimized && !cfg.Meta.FirstRun {
-		window.Hide()
-	}
-
 	return mw
 }
 

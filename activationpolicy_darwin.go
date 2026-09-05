@@ -7,25 +7,38 @@ package main
 #cgo LDFLAGS: -framework Cocoa
 #import <Cocoa/Cocoa.h>
 
+// AppKit is main-thread only, and these are reached from tray callbacks and from the instance
+// handover, neither of which is that thread.
 void SetActivationPolicyRegular(void) {
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+        // Activation on the next run-loop turn. Switching policy does not bring the app forward,
+        // and doing both in one turn leaves the Dock icon there with the window behind whatever
+        // was in front — visible in the menu bar, invisible on screen.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [NSApp activateIgnoringOtherApps:YES];
+        });
+    });
 }
 
 void SetActivationPolicyAccessory(void) {
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    });
 }
 */
 import "C"
 
 import "github.com/paradoxe35/myreviser/internal/logger"
 
-// showInDock makes the app appear in Dock (when window is visible)
+// showInDock puts MyReviser in the Dock and brings its window forward.
 func showInDock() {
 	logger.Info("Setting macOS activation policy to Regular (show in Dock)")
 	C.SetActivationPolicyRegular()
 }
 
-// hideFromDock makes the app disappear from Dock (when no windows visible)
+// hideFromDock returns MyReviser to a menu-bar-only app.
 func hideFromDock() {
 	logger.Info("Setting macOS activation policy to Accessory (hide from Dock)")
 	C.SetActivationPolicyAccessory()
